@@ -11,3 +11,5 @@ struct vm {
 };
 
 struct vm vm_create(void);
+
+void vm_init(struct vm* vm);

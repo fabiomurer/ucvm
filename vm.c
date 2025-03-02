@@ -1,7 +1,9 @@
+#include <asm/kvm.h>
 #define _GNU_SOURCE
 
 #include "utils.h"
 #include "vm.h"
+#include "vmm.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,12 +18,6 @@
 #include <error.h>
 
 #define KVM_DEVICE "/dev/kvm"
-
-#define PAGE_SIZE 4096
-#define PAGE_NUMBER 4096
-#define MEMORY_SIZE (PAGE_SIZE * PAGE_NUMBER)
-#define MEMORY_SLOT 1
-
 
 struct vm vm_create(void) {
     struct vm vm;
@@ -71,9 +67,9 @@ struct vm vm_create(void) {
     }
 
     struct kvm_userspace_memory_region region = {
-        .slot = 0,
+        .slot = MEMORY_SLOT,
         .flags = 0,
-        .guest_phys_addr = 0,
+        .guest_phys_addr = GUEST_PHYS_ADDR,
         .memory_size = MEMORY_SIZE,
         .userspace_addr = (uint64_t)vm.memory,
     };
@@ -83,4 +79,67 @@ struct vm vm_create(void) {
     }
 
     return vm;
+}
+
+void cpu_init_cpuid(struct vm* vm) {
+    struct kvm_cpuid2 *cpuid;
+    int max_entries = 100;
+    
+    cpuid = calloc(1, sizeof(*cpuid) + max_entries * sizeof(*cpuid->entries));
+    cpuid->nent = max_entries;
+
+    if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, cpuid) < 0) {
+        panic("KVM_GET_SUPPORTED_CPUID");
+    }
+
+    /*
+    x2APIC (CPUID leaf 1, ecx[21) and TSC deadline timer (CPUID leaf 1, ecx
+    [24]) may be returned as true, but they depend on KVM_CREATE_IRQCHIP for 
+    in-kernel emulation of the local APIC. 
+    => disable those bits
+    */
+    for (uint32_t i = 0; i < cpuid->nent; i++) {
+        struct kvm_cpuid_entry2 *entry = &cpuid->entries[i];
+        if (entry->function == 1 && entry->index == 0) {
+            // clearing x2APIC bit
+            entry->ecx &= ~(1 << 21);
+            // clearing TSC bit
+            entry->ecx &= ~(1 << 24);
+            break;
+        }
+    }
+
+    if (ioctl(vm->vcpufd, KVM_SET_CPUID2, cpuid) < 0) {
+        panic("KVM_SET_CPUID2");
+    }
+}
+
+void vm_init(struct vm* vm) {
+    cpu_init_cpuid(vm);
+
+    struct kvm_regs regs;
+    struct kvm_sregs2 sregs;
+    struct kvm_fpu fpu;
+
+    if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+        panic("KVM_GET_REGS");
+    }
+    if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
+        panic("KVM_GET_SREGS2");
+    }
+    if (ioctl(vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+        panic("KVM_GET_FPU");
+    }
+
+    cpu_init_long(&sregs, vm->memory);
+
+    if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+        panic("KVM_SET_REGS");
+    }
+    if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
+        panic("KVM_SET_SREGS2");
+    }
+    if (ioctl(vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
+        panic("KVM_SET_FPU");
+    }
 }
