@@ -146,10 +146,10 @@ static struct kvm_segment seg_from_desc(struct seg_desc e, uint32_t idx)
 	return res;
 }
 
-#define CRO_PROTECTED_MODE (1 << 0)
-#define CR0_ENABLE_PAGING	(1 << 31)
-#define CR4_ENABLE_PAE		(1 << 5)
-#define CR4_ENABLE_PGE		(1 << 7)
+#define CRO_PROTECTED_MODE 	(1ULL << 0)
+#define CR0_ENABLE_PAGING	(1ULL << 31)
+#define CR4_ENABLE_PAE		(1ULL << 5)
+#define CR4_ENABLE_PGE		(1ULL << 7)
 
 /*
 bit 10
@@ -159,8 +159,8 @@ Description: Indicates whether long mode is active. This bit is read-only and is
 	- 0: Long mode is not active
 	- 1: Long mode is active
 */
-#define EFER_LONG_MODE_ENABLED (1 << 8)
-#define EFER_LONG_MODE_ACTIVE (1 << 10)
+#define EFER_LONG_MODE_ENABLED 	(1ULL << 8)
+#define EFER_LONG_MODE_ACTIVE 	(1ULL << 10)
 
 /*
 bit 11
@@ -171,14 +171,14 @@ Description: Enables the no-execute page protection feature, which prevents code
     -0: No-execute page protection is disabled
     - 1: No-execute page protection is enabled
 */
-#define EFER_NO_EXECUTE_ENABLE (1 << 11)
+#define EFER_NO_EXECUTE_ENABLE (1ULL << 11)
 
 void cpu_init_long(struct kvm_sregs2 *sregs, void* memory) {
     guest_memory = memory;
 	// alloc one page for GDT (used) IDT (not used)
 	pml4t_addr = get_free_memory_chunk(1);
 	struct memory_chunk mem = get_free_memory_chunk(1);
-	void *gdt_addr = (void *)(mem.host + GDT_OFFSET);
+	void *gdt_addr = (void*)(mem.host + GDT_OFFSET);
 
 	struct kvm_segment code_segment = seg_from_desc(CODE_SEG, 1);
 	struct kvm_segment data_segment = seg_from_desc(DATA_SEG, 2);
@@ -206,12 +206,10 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void* memory) {
 	// IDT size (one null)
 	sregs->idt.limit = 7;
 
-    printf("%llx\n", sregs->cr0);
-	sregs->cr0 |= CR0_ENABLE_PAGING | CRO_PROTECTED_MODE;
+	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
    	sregs->cr3 = (uint64_t)pml4t_addr.guest;
     sregs->cr4 |= CR4_ENABLE_PAE | CR4_ENABLE_PGE;
-	sregs->efer |= EFER_LONG_MODE_ENABLED;
-	
+	sregs->efer |= EFER_LONG_MODE_ENABLED | EFER_LONG_MODE_ACTIVE; // EFER_LONG_MODE_ENABLED??
 	
 	// initialize segments for long mode
 	// code segment
@@ -263,8 +261,8 @@ struct memory_chunk get_free_memory_chunk(size_t pages_count) {
 #define SHIFT_LVL_2	21
 #define SHIFT_LVL_3	12
 
-#define PAGE_PRESENT	(1 << 0)
-#define PAGE_RW		    (1 << 1)
+#define PAGE_PRESENT	(1ULL << 0)
+#define PAGE_RW		    (1ULL << 1)
 
 // ?
 struct memory_chunk from_guest(uint64_t gaddr) {
