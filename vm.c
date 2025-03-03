@@ -114,6 +114,40 @@ void cpu_init_cpuid(struct vm* vm) {
     }
 }
 
+void cpu_init_extensions(struct kvm_sregs2* sregs) {
+    #define CR4_OSXSAVE     (1ULL << 18)     
+    #define CR4_FSGSBASE    (1ULL << 16)        
+    #define CR4_OSFXSR      (1ULL << 9)
+    
+    // sse
+    /*
+	clear the CR0.EM bit (bit 2) [ CR0 &= ~(1 << 2) ]
+	set the CR0.MP bit (bit 1) [ CR0 |= (1 << 1) ]
+	set the CR4.OSFXSR bit (bit 9) [ CR4 |= (1 << 9) ]
+	set the CR4.OSXMMEXCPT bit (bit 10) [ CR4 |= (1 << 10) ]
+	*/
+	sregs->cr0 &= ~(1ULL << 2); // CR0_EM
+	sregs->cr0 &= ~(1ULL << 3); // CR0_TS
+	sregs->cr0 |=  (1ULL << 1);
+	sregs->cr4 |=  CR4_OSFXSR;
+	sregs->cr4 |=  (1ULL << 10);
+
+    // avx
+    // Both SSE and OSXSAVE must be enabled before allowing. Failing to do so will also produce an #UD. 
+    sregs->cr4 |= CR4_OSXSAVE | CR4_FSGSBASE;
+}
+
+void cpu_init_fpu(struct kvm_fpu* fpu) {
+    /*
+    FNINIT will reset the user-visible part of the FPU stack. This will set precision to 64-bit 
+    and rounding to nearest, which should be correct for most operations. It will also
+    mask all exceptions from causing an interrupt.
+    */
+    fpu->fcw = 0x37f;
+	fpu->ftwx = 0xFF; // all empty
+	fpu->mxcsr = 0x1f80; //[ IM DM ZM OM UM PM ]; from qemu user
+}
+
 void vm_init(struct vm* vm) {
     cpu_init_cpuid(vm);
 
@@ -132,6 +166,10 @@ void vm_init(struct vm* vm) {
     }
 
     cpu_init_long(&sregs, vm->memory);
+
+    cpu_init_extensions(&sregs);
+
+    cpu_init_fpu(&fpu);
 
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
         panic("KVM_SET_REGS");
