@@ -148,12 +148,34 @@ void cpu_init_fpu(struct kvm_fpu* fpu) {
 	fpu->mxcsr = 0x1f80; //[ IM DM ZM OM UM PM ]; from qemu user
 }
 
+void cpu_init_xcrs(struct kvm_xcrs* xrcs) {
+    #define XCR0_X87    (1ULL << 0)  // x87 FPU/MMX state (must be 1)
+    #define XCR0_SSE    (1ULL << 1)  // SSE state
+    #define XCR0_AVX    (1ULL << 2)  // AVX state
+
+    #define XCR0_OPMASK (1LL << 5)
+    #define ZMM_Hi256   (1LL << 6)
+    #define Hi16_ZMM    (1LL << 7)
+
+    for (uint32_t i = 0; i < xrcs->nr_xcrs; i++) {
+        // found xcr0
+        if (xrcs->xcrs[i].xcr == 0) {
+            // avx
+            xrcs->xcrs[i].value |= XCR0_X87 | XCR0_SSE | XCR0_AVX;
+            // avx512
+            xrcs->xcrs[i].value |= XCR0_OPMASK | ZMM_Hi256 | Hi16_ZMM;
+            break;
+        }
+    }
+}
+
 void vm_init(struct vm* vm) {
     cpu_init_cpuid(vm);
 
     struct kvm_regs regs;
     struct kvm_sregs2 sregs;
     struct kvm_fpu fpu;
+    struct kvm_xcrs xcrs;
 
     if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
         panic("KVM_GET_REGS");
@@ -164,6 +186,9 @@ void vm_init(struct vm* vm) {
     if (ioctl(vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
         panic("KVM_GET_FPU");
     }
+    if (ioctl(vm->vcpufd, KVM_GET_XCRS, &xcrs) < 0) {
+        panic("KVM_GET_XCRS");
+    }
 
     cpu_init_long(&sregs, vm->memory);
 
@@ -171,6 +196,8 @@ void vm_init(struct vm* vm) {
 
     cpu_init_fpu(&fpu);
 
+    cpu_init_xcrs(&xcrs);
+    
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
         panic("KVM_SET_REGS");
     }
@@ -179,5 +206,8 @@ void vm_init(struct vm* vm) {
     }
     if (ioctl(vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
         panic("KVM_SET_FPU");
+    }
+    if (ioctl(vm->vcpufd, KVM_SET_XCRS, &xcrs) < 0) {
+        panic("KVM_SET_XCRS");
     }
 }
