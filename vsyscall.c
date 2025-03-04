@@ -1,5 +1,6 @@
 #include <linux/kvm.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
@@ -19,6 +20,11 @@ void* vm_guest_to_host(struct vm* vm, u_int64_t guest_addr) {
 
 	if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
 		panic("KVM_TRANSLATE");
+	}
+
+	if (transl_addr.valid == 0) {
+		fprintf(stderr, "KVM_TRANSLATE not valid\n");
+		exit(EXIT_FAILURE);
 	}
 
 	return (void*)((uint64_t)vm->memory + transl_addr.physical_address - GUEST_PHYS_ADDR);

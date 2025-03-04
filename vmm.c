@@ -177,8 +177,8 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void* memory) {
     guest_memory = memory;
 	// alloc one page for GDT (used) IDT (not used)
 	pml4t_addr = get_free_memory_chunk(1);
-	struct memory_chunk mem = get_free_memory_chunk(1);
-	void *gdt_addr = (void*)(mem.host + GDT_OFFSET);
+	struct memory_chunk mem_gdt = get_free_memory_chunk(1);
+	void* gdt_addr = (void*)(mem_gdt.host + GDT_OFFSET);
 
 	struct kvm_segment code_segment = seg_from_desc(CODE_SEG, 1);
 	struct kvm_segment data_segment = seg_from_desc(DATA_SEG, 2);
@@ -195,14 +195,14 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void* memory) {
     #pragma GCC diagnostic pop
 
 	// start address of gdt in guest
-	sregs->gdt.base = GDT_OFFSET + mem.guest;
+	sregs->gdt.base = GDT_OFFSET + mem_gdt.guest;
 	// size of the table (2 entry, 1 null)
 	sregs->gdt.limit = 3 * 8 - 1;
 
 	// IDT (interrupt description table) initialization, all null not used
-	memset((void *)(mem.host + IDT_OFFSET), 0, 8);
+	memset((void *)(mem_gdt.host + IDT_OFFSET), 0, 8);
 	// start address of IDT in guest
-	sregs->idt.base = IDT_OFFSET + mem.guest;
+	sregs->idt.base = IDT_OFFSET + mem_gdt.guest;
 	// IDT size (one null)
 	sregs->idt.limit = 7;
 
@@ -327,10 +327,10 @@ void map_range(uint64_t vaddr, uint64_t phys_addr, size_t pages_count)
     }
 }
 
-struct memory_chunk alloc_pages(size_t pages_count) {
+struct memory_chunk alloc_pages(uint64_t guest_vaddr, size_t pages_count) {
     struct memory_chunk mem = get_free_memory_chunk(pages_count);
     
-    map_range(mem.guest, mem.guest, pages_count);
+    map_range(guest_vaddr, mem.guest, pages_count);
 	return mem;
 }
 
@@ -340,7 +340,7 @@ struct memory_chunk alloc_memory(uint64_t guest_vaddr, size_t length) {
 	uint64_t end_addr = ROUND_PG(guest_vaddr+length);
 	size_t pages_count = (end_addr - start_addr) / PAGE_SIZE;
 
-	struct memory_chunk mem = alloc_pages(pages_count);
+	struct memory_chunk mem = alloc_pages(guest_vaddr, pages_count);
 	
 	return mem;
 }

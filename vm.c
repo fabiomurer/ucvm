@@ -71,6 +71,7 @@ struct vm vm_create(void) {
             ) == MAP_FAILED) {
         panic("MMAP");
     }
+    memset(vm.memory, 0, MEMORY_SIZE); // ?
 
     struct kvm_userspace_memory_region region = {
         .slot = MEMORY_SLOT,
