@@ -334,3 +334,13 @@ struct memory_chunk alloc_pages(size_t pages_count) {
 	return mem;
 }
 
+struct memory_chunk alloc_memory(uint64_t guest_vaddr, size_t length) {
+
+	uint64_t start_addr = TRUNC_PG(guest_vaddr);
+	uint64_t end_addr = ROUND_PG(guest_vaddr+length);
+	size_t pages_count = (end_addr - start_addr) / PAGE_SIZE;
+
+	struct memory_chunk mem = alloc_pages(pages_count);
+	
+	return mem;
+}
