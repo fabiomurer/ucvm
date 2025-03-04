@@ -1,6 +1,7 @@
-#include <asm/kvm.h>
 #define _GNU_SOURCE
-
+#include <asm/kvm.h>
+#include <signal.h>
+#include <sys/wait.h>
 #include "utils.h"
 #include "vm.h"
 #include "vmm.h"
@@ -234,6 +235,15 @@ void vm_load_program(struct vm* vm, char *argv[], struct linux_proc* linux_proc)
     }
 
     load_kvm(linux_proc->pid);
+
+    // kill traced process
+    if (kill(linux_proc->pid, SIGKILL) == -1) {
+        perror("kill");
+        exit(EXIT_FAILURE);
+    }
+    
+    int status;
+    waitpid(linux_proc->pid, &status, 0);
 }
 
 void vm_run(struct vm* vm, struct linux_proc* linux_proc) {
