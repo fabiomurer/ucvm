@@ -9,3 +9,5 @@ struct linux_proc {
     uint64_t rip;
     uint64_t rsp;
 };
+
+void load_linux(char** argv, struct linux_proc* linux_proc);

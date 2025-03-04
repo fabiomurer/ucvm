@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-void load_kvm(uint8_t* buffer, uint64_t len, uint64_t start, uint64_t end, char* perms, char* pathname) {
+void copy_into_kvm(uint8_t* buffer, uint64_t len, uint64_t start, uint64_t end, char* perms, char* pathname) {
     // allocating memory
     struct memory_chunk mem = alloc_memory(start, len);
 
@@ -19,7 +19,7 @@ void load_kvm(uint8_t* buffer, uint64_t len, uint64_t start, uint64_t end, char*
 
 #define LINE_SIZE 4096
 
-void linux_to_kvm_map(pid_t pid) {
+void load_kvm(pid_t pid) {
     
 
     char pid_string[128] = {0};
@@ -81,7 +81,7 @@ void linux_to_kvm_map(pid_t pid) {
             printf("Extracted segment 0x%lx-0x%lx (%ld bytes)\n", start, end, (long)read_bytes);
         }
 
-        load_kvm(buffer, segment_size, start, end, perms, pathname);
+        copy_into_kvm(buffer, segment_size, start, end, perms, pathname);
 
         free(buffer);
     }

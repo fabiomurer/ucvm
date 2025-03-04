@@ -4,6 +4,10 @@
 #include "utils.h"
 #include "vm.h"
 #include "vmm.h"
+#include "load_linux.h"
+#include "load_kvm.h"
+#include "vsyscall.h"
+#include "vminfo.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -16,6 +20,7 @@
 #include <linux/kvm.h>
 #include <stdbool.h>
 #include <error.h>
+#include <errno.h>
 
 #define KVM_DEVICE "/dev/kvm"
 
@@ -91,7 +96,7 @@ void cpu_init_cpuid(struct vm* vm) {
     if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, cpuid) < 0) {
         panic("KVM_GET_SUPPORTED_CPUID");
     }
-    
+
     /*
     x2APIC (CPUID leaf 1, ecx[21) and TSC deadline timer (CPUID leaf 1, ecx
     [24]) may be returned as true, but they depend on KVM_CREATE_IRQCHIP for 
@@ -210,4 +215,79 @@ void vm_init(struct vm* vm) {
     if (ioctl(vm->vcpufd, KVM_SET_XCRS, &xcrs) < 0) {
         panic("KVM_SET_XCRS");
     }
+}
+
+void vm_load_program(struct vm* vm, char *argv[], struct linux_proc* linux_proc) {
+    load_linux(argv, linux_proc);
+
+    // update vcpu
+    struct kvm_regs regs;
+    if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+        panic("KVM_GET_REGS");
+    }
+
+    regs.rip = linux_proc->rip;
+    regs.rsp = linux_proc->rsp;
+
+    if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+        panic("KVM_SET_REGS");
+    }
+
+    load_kvm(linux_proc->pid);
+}
+
+void vm_run(struct vm* vm, struct linux_proc* linux_proc) {
+    while(true) {
+        if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
+            panic("KVM_RUN");
+        }
+
+        struct kvm_run* run = vm->run;
+    	printf("exit reason: %d\n", run->exit_reason);
+
+		switch (run->exit_reason) {
+		case KVM_EXIT_HLT:
+			printf("KVM_EXIT_HLT\n");
+			return;
+			
+		case KVM_EXIT_SHUTDOWN:
+			struct kvm_regs regs;
+			if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+				panic("KVM_GET_REGS");
+			}
+
+			if (is_syscall(vm, &regs)) {
+				
+				if (syscall_handler(vm, linux_proc, &regs) == ENOSYS) {
+					printf("syscall num: %lld not supported\n", regs.rax);
+					exit(-1);
+				}
+				
+                // skip syscall instruction
+				regs.rip += SYSCALL_OP_SIZE;
+
+				if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+					perror("KVM_GET_REGS");
+					exit(-1);
+				}
+			} else {
+				printf("unespected shutdown\n");
+				vcpu_events_logs(vm);
+				vcpu_regs_log(vm);
+				exit(-1);
+			}
+			break;
+		case KVM_EXIT_FAIL_ENTRY:
+			printf("KVM_EXIT_FAIL_ENTRY: 0x%lx\n",
+			     (uint64_t)run->fail_entry.hardware_entry_failure_reason);
+			break;
+		case KVM_EXIT_INTERNAL_ERROR:
+			printf("KVM_EXIT_INTERNAL_ERROR: suberror = 0x%x\n",
+			     run->internal.suberror);
+			return;
+		default:
+			printf("Odd exit reason: %d\n", run->exit_reason);
+			return;
+		}
+	}
 }

@@ -269,7 +269,7 @@ void remove_vdso(int pid) {
     }
 }
 
-struct linux_proc load_linux(char** argv) {
+void load_linux(char** argv, struct linux_proc* linux_proc) {
     struct linux_proc proc;
 
     int status = 0;
@@ -340,13 +340,11 @@ struct linux_proc load_linux(char** argv) {
                 panic("ptrace(PTRACE_GETREGS)");
             }
 
-            proc = (struct linux_proc){
-                .pid = child,
-                .brk = brk,
-                .rip = user_regs.rip,
-                .rsp = user_regs.rsp
-            };
-            return proc;
+            linux_proc->pid = child;
+            linux_proc->brk = brk;
+            linux_proc->rip = user_regs.rip;
+            linux_proc->rsp = user_regs.rsp;
+            
         } else {
             fprintf(stderr, "Unexpected stop before exec event occurred.\n");
             exit(EXIT_FAILURE);
