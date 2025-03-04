@@ -91,7 +91,7 @@ void cpu_init_cpuid(struct vm* vm) {
     if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, cpuid) < 0) {
         panic("KVM_GET_SUPPORTED_CPUID");
     }
-
+    
     /*
     x2APIC (CPUID leaf 1, ecx[21) and TSC deadline timer (CPUID leaf 1, ecx
     [24]) may be returned as true, but they depend on KVM_CREATE_IRQCHIP for 
@@ -162,8 +162,8 @@ void cpu_init_xcrs(struct kvm_xcrs* xrcs) {
         if (xrcs->xcrs[i].xcr == 0) {
             // avx
             xrcs->xcrs[i].value |= XCR0_X87 | XCR0_SSE | XCR0_AVX;
-            // avx512
-            xrcs->xcrs[i].value |= XCR0_OPMASK | ZMM_Hi256 | Hi16_ZMM;
+            // avx512 not supported
+            // xrcs->xcrs[i].value |= XCR0_OPMASK | ZMM_Hi256 | Hi16_ZMM;
             break;
         }
     }
