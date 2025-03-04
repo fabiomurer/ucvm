@@ -270,7 +270,6 @@ void remove_vdso(int pid) {
 }
 
 void load_linux(char** argv, struct linux_proc* linux_proc) {
-    struct linux_proc proc;
 
     int status = 0;
     pid_t child = fork();

@@ -1,3 +1,5 @@
+#include <asm/kvm.h>
+#include <asm/unistd_64.h>
 #include <linux/kvm.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -8,6 +10,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <linux/futex.h>
+#include <asm/prctl.h>
 
 #include "vsyscall.h"
 #include "utils.h"
@@ -67,6 +71,28 @@ uint64_t vlinux_syscall_brk(struct linux_proc* linux_proc, uint64_t addr) {
 	return linux_proc->brk;
 }
 
+uint64_t vlinux_syscall_arch_prctl(struct vm* vm, uint64_t op, uint64_t addr) {
+	uint64_t ret = -1;
+	struct kvm_sregs2 sregs;
+	switch(op) {
+		case ARCH_SET_FS:
+			if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
+				panic("KVM_GET_SREGS2");
+			}
+
+			// set the base address of fs register to addr
+			sregs.fs.base = addr;
+			
+			if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
+				panic("KVM_SET_SREGS2");
+			}
+			return 0;
+		default:
+			panic("vlinux_syscall_arch_prctl OP NOT SUPPORTED");
+			break;
+	}
+	return ret;
+}
 
 uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kvm_regs* regs) {
 	uint64_t sysno = regs->rax;
@@ -105,6 +131,60 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			printf("exit code: %d\n", (int)arg1);
 			printf("=======\n");
 			_exit(arg1);
+			break;
+		
+		case __NR_arch_prctl:
+			printf("=======__NR_arch_prctl\n");
+			printf("op: %d\n", (int)arg1);
+			printf("add: %p\n", (void*)arg2);
+			printf("=======\n");
+			ret = vlinux_syscall_arch_prctl(vm, arg1, arg2);
+			break;
+
+		case __NR_set_tid_address:
+			printf("=======__NR_set_tid_address\n");
+			printf("tidptr: %p\n", (void*)arg1);
+			printf("=======\n");
+
+			/*
+			The system call set_tid_address() sets the clear_child_tid value
+			for the calling thread to tidptr.
+			*/
+			linux_proc->clear_child_tid = arg1;
+
+			/*
+			set_tid_address() always returns the caller's thread ID.
+			for now 1 thread -> thread ID = 0
+			*/
+			ret = 0;
+			break;
+		
+		case __NR_set_robust_list:
+			printf("=======__NR_set_robust_list\n");
+			printf("head_ptr: %p\n", (void*)arg1);
+			printf("sizep: %lu\n", arg2);
+			printf("=======\n");
+
+			/*
+			The set_robust_list() system call requests the kernel to record
+       		the head of the list of robust futexes owned by the calling
+       		thread.  The head argument is the list head to record.  The size
+       		argument should be sizeof(*head).
+			*/
+			if (arg2 == sizeof(struct robust_list_head)) {
+				linux_proc->robust_list_head_ptr = arg1;
+				ret = 0;
+			} else {
+				ret = -1;
+			}
+			break;
+		
+		// https://manpages.opensuse.org/Tumbleweed/librseq-devel/rseq.2.en.html
+		case __NR_rseq: // what is this?? not implemented -> hopefully not used
+			printf("=======__NR_rseq\n");
+			printf("SYSCALL IGNORED\n");
+			printf("=======\n");
+			ret = 0;
 			break;
 
 		default:
