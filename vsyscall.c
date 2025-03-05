@@ -1,8 +1,13 @@
+#define _GNU_SOURCE
 #include <asm/kvm.h>
 #include <asm/unistd_64.h>
+#include <fcntl.h>
 #include <linux/kvm.h>
+#include <linux/limits.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
@@ -33,6 +38,35 @@ void* vm_guest_to_host(struct vm* vm, u_int64_t guest_addr) {
 	}
 
 	return (void*)((uint64_t)vm->memory + transl_addr.physical_address - GUEST_PHYS_ADDR);
+}
+
+void read_string_host(struct vm* vm, uint64_t guest_string_addr, char* buf, size_t bufsiz) {
+	size_t byte_read = 0;
+	char* host_addr = NULL;
+
+	memset(buf, 0, bufsiz);
+	do {
+		host_addr = vm_guest_to_host(vm, guest_string_addr + byte_read);
+		buf[byte_read] = *host_addr;
+		byte_read++;
+	} while (byte_read < bufsiz && *host_addr != '\0');
+}
+
+void write_string_guest(struct vm* vm, uint64_t guest_string_addr, char* buf, size_t bufsiz) {
+	size_t byte_written = 0;
+	char* host_addr = NULL;
+
+	do {
+		host_addr = vm_guest_to_host(vm, guest_string_addr + byte_written);
+		*host_addr = buf[byte_written];
+		byte_written++;
+	} while (byte_written < bufsiz && buf[byte_written] != '\0');
+
+	if (byte_written+1 < bufsiz) {
+		byte_written++;
+		host_addr = vm_guest_to_host(vm, guest_string_addr + byte_written);
+		*host_addr = '\0';
+	}
 }
 
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
@@ -160,6 +194,32 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			for now 1 thread -> thread ID = 0
 			*/
 			ret = 0;
+			break;
+
+		case __NR_readlinkat:
+			char pathname[PATH_MAX];
+			read_string_host(vm, arg2, pathname, PATH_MAX);
+			int dirfd = (int)arg1;
+			printf("=======__NR_readlinkat\n");
+			printf("dirfd: %d\n", dirfd);
+			printf("pathname: %s\n", pathname);
+			printf("bufsiz: %lu\n", arg4);
+			printf("=======\n");
+
+			// support only get process path
+			if (strcmp("/proc/self/exe", pathname) == 0 && dirfd == AT_FDCWD) {
+				char buf[PATH_MAX] = "\0";
+				if (realpath(linux_proc->argv[0], buf) == NULL) {
+					panic("realpath");
+				}
+				ret = strlen(buf);
+
+				write_string_guest(vm, arg3, buf, PATH_MAX);
+				printf("%s\n", buf);
+			} else {
+				panic("__NR_readlinkat case not supported");
+				ret = -1;
+			}
 			break;
 		
 		case __NR_set_robust_list:

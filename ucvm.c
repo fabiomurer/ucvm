@@ -11,9 +11,10 @@ int main(int argc, char *argv[]) {
 	}
 
     struct linux_proc linux_proc;
+	linux_proc.argv = &argv[1];
 	
 	struct vm vm = vm_create();
     vm_init(&vm);
-    vm_load_program(&vm, &argv[1], &linux_proc);
+    vm_load_program(&vm, &linux_proc);
     vm_run(&vm, &linux_proc);
 }

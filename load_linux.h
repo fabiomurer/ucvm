@@ -4,6 +4,8 @@
 #include <sys/types.h>
 
 struct linux_proc {
+    char** argv;
+
     pid_t pid;
 
     // for brk syscall
