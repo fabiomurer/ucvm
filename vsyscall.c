@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <linux/futex.h>
 #include <asm/prctl.h>
+#include <sys/resource.h>
 
 #include "vsyscall.h"
 #include "utils.h"
@@ -99,6 +100,8 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 	uint64_t arg1 = regs->rdi;
 	uint64_t arg2 = regs->rsi;
 	uint64_t arg3 = regs->rdx;
+	uint64_t arg4 = regs->r10;
+	uint64_t arg5 = regs->r9;
 	uint64_t ret = 0;
 
 	switch (sysno) {
@@ -176,6 +179,32 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				ret = 0;
 			} else {
 				ret = -1;
+			}
+			break;
+		
+		case __NR_prlimit64:
+			/*
+			int prlimit(pid_t pid, int resource,
+                   const struct rlimit *_Nullable new_limit,
+                   struct rlimit *_Nullable old_limit);
+
+       		struct rlimit {
+       		    rlim_t  rlim_cur;  //Soft limit 
+       		    rlim_t  rlim_max;  // Hard limit (ceiling for rlim_cur)
+       		};
+			*/
+			printf("=======__NR_prlimit64\n");
+			printf("pid: %ld\n", arg1);
+			printf("resource: %ld\n", arg2);
+			printf("new_limit: %p\n", (void*)arg3);
+			printf("old_limit: %p\n", (void*)arg4);
+			printf("=======\n");
+
+			if (arg1 == 0 && arg2 == RLIMIT_STACK) {
+				// for vm no limit for stack-> do nothing
+				ret = 0;
+			} else {
+				panic("__NR_prlimit64 case not supported");
 			}
 			break;
 		
