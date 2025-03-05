@@ -18,6 +18,7 @@
 #include <linux/futex.h>
 #include <asm/prctl.h>
 #include <sys/resource.h>
+#include <sys/random.h>
 
 #include "vsyscall.h"
 #include "utils.h"
@@ -67,6 +68,17 @@ void write_string_guest(struct vm* vm, uint64_t guest_string_addr, char* buf, si
 		host_addr = vm_guest_to_host(vm, guest_string_addr + byte_written);
 		*host_addr = '\0';
 	}
+}
+
+void write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, char* buf, size_t bufsiz) {
+	size_t byte_written = 0;
+	char* host_addr = NULL;
+
+	do {
+		host_addr = vm_guest_to_host(vm, guest_buffer_addr + byte_written);
+		*host_addr = buf[byte_written];
+		byte_written++;
+	} while (byte_written < bufsiz);
 }
 
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
@@ -267,6 +279,26 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				panic("__NR_prlimit64 case not supported");
 			}
 			break;
+
+		case __NR_getrandom:
+			uint64_t buf = arg1;
+			size_t buflen = arg2;
+			unsigned int flags = arg3;
+			printf("=======__NR_getrandom\n");
+			printf("buf: %p\n", (void*)buf);
+			printf("buflen: %ld\n", buflen);
+			printf("flags: 0x%d\n", flags);
+			printf("=======\n");
+
+			char* tbuf = malloc(buflen * sizeof(char));
+			if (tbuf == NULL) panic("malloc");
+
+			ret = getrandom(tbuf, buflen, flags);
+			write_buffer_guest(vm, buf, tbuf, buflen);
+
+			free(tbuf);
+			break;
+
 		
 		// https://manpages.opensuse.org/Tumbleweed/librseq-devel/rseq.2.en.html
 		case __NR_rseq: // what is this?? not implemented -> hopefully not used

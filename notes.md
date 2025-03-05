@@ -18,8 +18,8 @@ set_tid_address(0x3c458690)             = 49828
 set_robust_list(0x3c4586a0, 24)         = 0         
 rseq(0x3c458340, 0x20, 0, 0x53053053)   = 0         
 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0    
-readlinkat(AT_FDCWD, "/proc/self/exe", "/home/fabio/Documents/projects/u"..., 4096) = 53 (:>)
-getrandom("\xc4\x50\xa2\x52\xb7\x00\x3c\x18", 8, GRND_NONBLOCK) = 8
+readlinkat(AT_FDCWD, "/proc/self/exe", "/home/fabio/Documents/projects/u"..., 4096) = 53 
+getrandom("\xc4\x50\xa2\x52\xb7\x00\x3c\x18", 8, GRND_NONBLOCK) = 8 (:>)
 brk(NULL)                               = 0x3c458d40
 brk(0x3c479d40)                         = 0x3c479d40
 brk(0x3c47a000)                         = 0x3c47a000
