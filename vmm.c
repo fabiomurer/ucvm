@@ -2,6 +2,7 @@
 #include "utils.h"
 
 #include <linux/const.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -317,13 +318,50 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 	}
 }
 
+bool segment_already_mapped(uint64_t vaddr) {
+	size_t i = 0;
+
+	struct memory_chunk cur_addr = pml4t_addr;
+	uint64_t ind[PAGE_TABLE_LEVELS] = {
+		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
+		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
+		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
+		(vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3,
+	};
+
+	// if not alligned
+	vaddr = TRUNC_PG(vaddr);
+	
+	// map page walk
+	for (i = 0; i < PAGE_TABLE_LEVELS; i++) {
+		uint64_t *g_a = (uint64_t *)(cur_addr.host + ind[i] * sizeof(uint64_t));
+		
+		// if last level
+		if (i == PAGE_TABLE_LEVELS - 1) {
+			if (*g_a) 	return true;
+			else 		return false;
+		}
+		// if the part of the current level is not mapped, page is not mapped
+		if (!*g_a) return false;
+
+		cur_addr = from_guest(*g_a);
+	}
+	return false;
+}
+
 void map_range(uint64_t vaddr, uint64_t phys_addr, size_t pages_count)
 {
 	size_t mapped;
 	printf("Mapping range from %lx to %lx\n", vaddr, vaddr + pages_count * PAGE_SIZE);
 
 	for (mapped = 0; mapped < pages_count; mapped++) {
-        map_addr(vaddr + PAGE_SIZE * mapped, phys_addr + PAGE_SIZE * mapped);
+		if (!segment_already_mapped(vaddr)) {
+			map_addr(vaddr, phys_addr);
+		} else {
+			fprintf(stderr, "segment already mapped\n");
+		}
+		vaddr += PAGE_SIZE;
+		phys_addr += PAGE_SIZE;
     }
 }
 
@@ -340,7 +378,7 @@ struct memory_chunk alloc_memory(uint64_t guest_vaddr, size_t length) {
 	uint64_t end_addr = ROUND_PG(guest_vaddr+length);
 	size_t pages_count = (end_addr - start_addr) / PAGE_SIZE;
 
-	struct memory_chunk mem = alloc_pages(guest_vaddr, pages_count);
+	struct memory_chunk mem = alloc_pages(start_addr, pages_count);
 	
 	return mem;
 }

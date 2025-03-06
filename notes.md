@@ -19,14 +19,14 @@ set_robust_list(0x4af6a0, 24)           = 0
 rseq(0x4af340, 0x20, 0, 0x53053053)     = 0
 prlimit64(0, RLIMIT_STACK, NULL, {rlim_cur=8192*1024, rlim_max=RLIM64_INFINITY}) = 0
 readlinkat(AT_FDCWD, "/proc/self/exe", "/home/fabione/Documents/progetti"..., 4096) = 55
-getrandom("\x08\x62\x35\x59\xad\x4f\x66\x34", 8, GRND_NONBLOCK) = 8 (:>)
+getrandom("\x08\x62\x35\x59\xad\x4f\x66\x34", 8, GRND_NONBLOCK) = 8 
 brk(NULL)                               = 0x4afd40
 brk(0x4d0d40)                           = 0x4d0d40
 brk(0x4d1000)                           = 0x4d1000
-mprotect(0x4a2000, 20480, PROT_READ)    = 0
+mprotect(0x4a2000, 20480, PROT_READ)    = 0 
 fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(0x88, 0x2), ...}) = 0
 write(1, "ciao\n", 5ciao
-)                   = 5
+)                   = 5         (:>)
 exit_group(0)                           = ?
 +++ exited with 0 +++
 ```

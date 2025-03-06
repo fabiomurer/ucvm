@@ -19,6 +19,8 @@
 #include <asm/prctl.h>
 #include <sys/resource.h>
 #include <sys/random.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "vsyscall.h"
 #include "utils.h"
@@ -34,7 +36,7 @@ void* vm_guest_to_host(struct vm* vm, u_int64_t guest_addr) {
 	}
 
 	if (transl_addr.valid == 0) {
-		fprintf(stderr, "KVM_TRANSLATE not valid\n");
+		fprintf(stderr, "KVM_TRANSLATE address: %p not valid\n", (void*)guest_addr);
 		exit(EXIT_FAILURE);
 	}
 
@@ -70,13 +72,13 @@ void write_string_guest(struct vm* vm, uint64_t guest_string_addr, char* buf, si
 	}
 }
 
-void write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, char* buf, size_t bufsiz) {
+void write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, void* buf, size_t bufsiz) {
 	size_t byte_written = 0;
 	char* host_addr = NULL;
 
 	do {
 		host_addr = vm_guest_to_host(vm, guest_buffer_addr + byte_written);
-		*host_addr = buf[byte_written];
+		*host_addr = *(char*)(buf + byte_written);
 		byte_written++;
 	} while (byte_written < bufsiz);
 }
@@ -168,6 +170,36 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 			break;
 
+		case __NR_fstat:
+			int fd = (int)arg1;
+			uint64_t statbuf = arg2;
+			struct stat tmp_statbuf;
+			printf("=======__NR_fstat\n");
+			printf("fd: %d\n", fd);
+			printf("statbuf: %p\n", (void*)statbuf);
+			printf("=======\n");
+
+			if (fstat(fd, &tmp_statbuf) < 0) {
+				ret = -errno;
+			} else {
+				write_buffer_guest(vm, statbuf, &tmp_statbuf, sizeof(tmp_statbuf));
+			}
+			break;
+
+		case __NR_mprotect:
+			void* addr = (void*)arg1;
+			size_t size = arg2;
+			int proto = (int)arg3;
+			printf("=======__NR_mprotect\n");
+			printf("addr: %p\n", addr);
+			printf("size: %ld\n", size);
+			printf("proto: %d\n", proto);
+			// for now not support memory protection
+			printf("SYSCALL IGNORED\n");
+			printf("=======\n");
+			ret = 0;
+			break;
+
 		case __NR_brk:
 			printf("=======__NR_brk\n");
 			printf("addr: %p\n", (void*)arg1);
@@ -206,6 +238,14 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			for now 1 thread -> thread ID = 0
 			*/
 			ret = 0;
+			break;
+
+		case __NR_exit_group:
+			int status = (int)arg1;
+			printf("=======__NR_exit_group\n");
+			printf("status: %d\n", status);
+			printf("=======\n");
+			syscall(SYS_exit_group, status);
 			break;
 
 		case __NR_readlinkat:
