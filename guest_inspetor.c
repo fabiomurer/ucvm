@@ -52,6 +52,30 @@ void write_string_guest(struct vm* vm, uint64_t guest_string_addr, char* buf, si
 	}
 }
 
+void read_buffer_host(struct vm* vm, uint64_t guest_buffer_addr, char* buf, size_t bufsiz) {
+	size_t byte_read = 0;
+	char* host_addr = NULL;
+
+    do {
+        uint64_t start = guest_buffer_addr + byte_read;
+        uint64_t end;
+        if (ROUND_PG(start) < guest_buffer_addr + bufsiz) {
+            // copy in one go at max at end of a page
+            end = ROUND_PG(start);
+        } else {
+            // it ends before the next page
+            end = guest_buffer_addr + bufsiz;
+        }
+        uint64_t delta = end - start;
+
+        host_addr = vm_guest_to_host(vm, start);
+
+        memcpy(buf + byte_read, host_addr, delta);
+
+        byte_read += delta;
+    } while (byte_read < bufsiz);
+}
+
 void write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, void* buf, size_t bufsiz) {
 	size_t byte_written = 0;
 	char* host_addr = NULL;

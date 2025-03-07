@@ -26,7 +26,8 @@
 #define KVM_DEVICE "/dev/kvm"
 
 struct vm vm_create(void) {
-    struct vm vm;
+    struct vm vm = {0};
+    vm.debug_enabled = false;
 
     // connect to kvm
     if ((vm.kvmfd = open(KVM_DEVICE, O_RDWR | O_CLOEXEC)) < 0) {
@@ -219,6 +220,36 @@ void vm_init(struct vm* vm) {
     }
 }
 
+void vm_set_debug(struct vm* vm, bool enable_debug) {
+
+    if (enable_debug) {
+        vm->guest_debug.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_HW_BP | KVM_GUESTDBG_USE_SW_BP;
+    } else {
+        vm->guest_debug.control = 0x0;
+    }
+
+    if (ioctl(vm->vcpufd, KVM_SET_GUEST_DEBUG, &vm->guest_debug) < 0) {
+		panic("KVM_SET_GUEST_DEBUG");
+	}
+    vm->debug_enabled = enable_debug;
+}
+
+void vm_set_debug_step(struct vm* vm, bool enable_step) {
+    if (!vm->debug_enabled) {
+        panic("cannot step if debug is disabled");
+    }
+
+    if (enable_step) {
+        vm->guest_debug.control |= KVM_GUESTDBG_SINGLESTEP;
+    } else {
+        vm->guest_debug.control &= ~(KVM_GUESTDBG_SINGLESTEP);
+    }
+
+    if (ioctl(vm->vcpufd, KVM_SET_GUEST_DEBUG, &vm->guest_debug) < 0) {
+		panic("KVM_SET_GUEST_DEBUG");
+	}
+}
+
 void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
     load_linux(linux_proc->argv, linux_proc);
 
@@ -247,60 +278,75 @@ void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
     waitpid(linux_proc->pid, &status, 0);
 }
 
-void vm_run(struct vm* vm, struct linux_proc* linux_proc) {
-    while(true) {
-        if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
-            panic("KVM_RUN");
-        }
+int vm_run(struct vm* vm) {
+    
+    if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
+        panic("KVM_RUN");
+    }
 
-        struct kvm_run* run = vm->run;
-    	printf("exit reason: %d\n", run->exit_reason);
+    return vm->run->exit_reason;
+}
 
-		switch (run->exit_reason) {
-		case KVM_EXIT_HLT:
-			printf("KVM_EXIT_HLT\n");
-			return;
+void vm_exit_handler(int exit_code, struct vm* vm, struct linux_proc* linux_proc) {
+    
+	switch (exit_code) {
+    case KVM_EXIT_DEBUG:
+        printf("KVM_EXIT_DEBUG\n");
+        printf(
+            "exception: 0x%x\n"
+            "pad: 0x%x\n"
+            "pc: 0x%llx\n"
+            "dr6: 0x%llx\n"
+            "dr7: 0x%llx\n", 
+            vm->run->debug.arch.exception,
+            vm->run->debug.arch.pad,
+            vm->run->debug.arch.pc,
+            vm->run->debug.arch.dr6,
+            vm->run->debug.arch.dr7
+        );
+        break;
+	case KVM_EXIT_HLT:
+		printf("KVM_EXIT_HLT\n");
+		break;
+		
+	case KVM_EXIT_SHUTDOWN:
+		struct kvm_regs regs;
+		if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+			panic("KVM_GET_REGS");
+		}
+		if (is_syscall(vm, &regs)) {
 			
-		case KVM_EXIT_SHUTDOWN:
-			struct kvm_regs regs;
-			if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-				panic("KVM_GET_REGS");
-			}
-
-			if (is_syscall(vm, &regs)) {
-				
-				if (syscall_handler(vm, linux_proc, &regs) == ENOSYS) {
-                    vcpu_events_logs(vm);
-				    vcpu_regs_log(vm);
-					printf("syscall num: %lld not supported\n", regs.rax);
-					exit(-1);
-				}
-				
-                // skip syscall instruction
-				regs.rip += SYSCALL_OP_SIZE;
-
-				if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
-					perror("KVM_GET_REGS");
-					exit(-1);
-				}
-			} else {
-				printf("unespected shutdown\n");
-				vcpu_events_logs(vm);
-				vcpu_regs_log(vm);
+			if (syscall_handler(vm, linux_proc, &regs) == ENOSYS) {
+                vcpu_events_logs(vm);
+			    vcpu_regs_log(vm);
+				printf("syscall num: %lld not supported\n", regs.rax);
 				exit(-1);
 			}
-			break;
-		case KVM_EXIT_FAIL_ENTRY:
-			printf("KVM_EXIT_FAIL_ENTRY: 0x%lx\n",
-			     (uint64_t)run->fail_entry.hardware_entry_failure_reason);
-			break;
-		case KVM_EXIT_INTERNAL_ERROR:
-			printf("KVM_EXIT_INTERNAL_ERROR: suberror = 0x%x\n",
-			     run->internal.suberror);
-			return;
-		default:
-			printf("Odd exit reason: %d\n", run->exit_reason);
-			return;
+			
+            // skip syscall instruction
+			regs.rip += SYSCALL_OP_SIZE;
+			if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+				perror("KVM_GET_REGS");
+				exit(-1);
+			}
+		} else {
+			printf("unespected shutdown\n");
+			vcpu_events_logs(vm);
+			vcpu_regs_log(vm);
+			exit(-1);
 		}
+		break;
+	case KVM_EXIT_FAIL_ENTRY:
+		printf("KVM_EXIT_FAIL_ENTRY: 0x%lx\n",
+		     (uint64_t)vm->run->fail_entry.hardware_entry_failure_reason);
+		break;
+	case KVM_EXIT_INTERNAL_ERROR:
+		printf("KVM_EXIT_INTERNAL_ERROR: suberror = 0x%x\n",
+		     vm->run->internal.suberror);
+        break;
+	default:
+		printf("Odd exit reason: %d\n", vm->run->exit_reason);
+        exit(EXIT_FAILURE);
+		break;
 	}
 }
