@@ -1,0 +1,3 @@
+[submodule "mini-gdbstub"]
+	path = mini-gdbstub
+	url = https://github.com/RinHizakura/mini-gdbstub.git
