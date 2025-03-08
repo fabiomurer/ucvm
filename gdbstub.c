@@ -91,6 +91,8 @@ enum GDB_REGISTER {
 
 static int read_reg(void *args, int regno, size_t *reg_value) {
     struct debug_args* debug_args = (struct debug_args*)args;
+
+    printf("read_reg regno: %d\n", regno);
     
     struct kvm_regs regs;
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
@@ -261,7 +263,13 @@ static int read_reg(void *args, int regno, size_t *reg_value) {
             *reg_value = fpu.mxcsr;
             return 0;
             
+        /*
         default:
+            return EFAULT;
+        */
+        default:
+            *reg_value = 0; // not supported -> write 0
+            return 0;
             return EFAULT;
     }
     return 0;
@@ -269,6 +277,8 @@ static int read_reg(void *args, int regno, size_t *reg_value) {
 
 static int write_reg(void *args, int regno, size_t data) {
     struct debug_args* debug_args = (struct debug_args*)args;
+
+    printf("write_reg regno: %d\n", regno);
     
     struct kvm_regs regs;
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
@@ -489,18 +499,24 @@ static int write_reg(void *args, int regno, size_t data) {
 }
 
 static int read_mem(void *args, size_t addr, size_t len, void *val) {
+    printf("read_mem addr: %p, len: %ld\n", (void*)addr, len);
+
     struct debug_args* debug_args = (struct debug_args*)args;
     read_buffer_host(debug_args->vm, addr, val, len);
     return 0;
 }
 
 static int write_mem(void *args, size_t addr, size_t len, void *val) {
+    printf("write_mem addr: %p, len: %ld\n", (void*)addr, len);
+
     struct debug_args* debug_args = (struct debug_args*)args;
     write_buffer_guest(debug_args->vm, addr, val, len);
     return 0;
 }
 
 static gdb_action_t cont(void *args) {
+    printf("continue\n");
+
     struct debug_args* debug_args = (struct debug_args*)args;
 
     int exit_code;
@@ -512,6 +528,7 @@ static gdb_action_t cont(void *args) {
 }
 
 static gdb_action_t stepi(void *args) {
+    printf("stepi\n");
     struct debug_args* debug_args = (struct debug_args*)args;
 
     vm_set_debug_step(debug_args->vm, true);
@@ -525,6 +542,7 @@ static gdb_action_t stepi(void *args) {
 }
 
 static bool set_bp(void *args, size_t addr, bp_type_t type) {
+    printf("set_bp addr: %p, type: %d\n", (void*)addr, type);
     struct debug_args* debug_args = (struct debug_args*)args;
 
     if (type != BP_SOFTWARE) {
@@ -538,6 +556,7 @@ static bool set_bp(void *args, size_t addr, bp_type_t type) {
 }
 
 static bool del_bp(void *args, size_t addr, bp_type_t type) {
+    printf("del_bp addr: %p, type: %d\n", (void*)addr, type);
     struct debug_args* debug_args = (struct debug_args*)args;
 
     /*
@@ -548,6 +567,7 @@ static bool del_bp(void *args, size_t addr, bp_type_t type) {
 }
 
 static void on_interrupt(void *args) {
+    printf("on_interrupt\n");
     struct debug_args* debug_args = (struct debug_args*)args;
     /*
     exit ??
@@ -557,8 +577,8 @@ static void on_interrupt(void *args) {
 
 arch_info_t arch_info = {
     .smp = 1,
-    .reg_num = GDB_CPU_X86_64_NUM_REGISTERS, // bho
-    .reg_byte = sizeof(uintptr_t),
+    .reg_num = 73, // bho
+    .reg_byte = 8,
     .target_desc = TARGET_X86_64 // bho
 };
 
