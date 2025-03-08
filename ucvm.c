@@ -1,4 +1,5 @@
 
+#include "gdbstub.h"
 #include "load_linux.h"
 #include "vm.h"
 #include <stdbool.h>
@@ -24,7 +25,13 @@ int main(int argc, char *argv[]) {
     vm_init(&vm);
     vm_load_program(&vm, &linux_proc);
 	if (debug) {
+		struct debug_args debug_args = {
+			.vm = &vm,
+			.linux_proc = &linux_proc
+		};
+
 		vm_set_debug(&vm, true);
+		debug_start(&debug_args);
 	} else {
 		while(true) {
 			int exit_code = vm_run(&vm);

@@ -2,10 +2,13 @@
 #include "load_linux.h"
 #include "utils.h"
 #include "vm.h"
+#include "gdbstub.h"
 #include "guest_inspector.h"
 #include <errno.h>
 #include <stdint.h>
 #include <linux/kvm.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 
 
@@ -41,11 +44,6 @@ enum GDB_REGISTER {
     /* FPU/SSE/AVX registers would follow... */
     
     GDB_CPU_X86_64_NUM_REGISTERS = 24  /* Base register count without FPU/SIMD */
-};
-
-struct debug_args {
-    struct vm* vm;
-    struct linux_proc* linux_proc;
 };
 
 static int read_reg(void *args, int regno, size_t *reg_value) {
@@ -291,6 +289,11 @@ static int write_mem(void *args, size_t addr, size_t len, void *val) {
 static gdb_action_t cont(void *args) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
+    int exit_code;
+    while ((exit_code = vm_run(debug_args->vm)) != KVM_EXIT_DEBUG) {
+        vm_exit_handler(exit_code, debug_args->vm, debug_args->linux_proc);
+    }
+
     return ACT_RESUME;
 }
 
@@ -310,17 +313,32 @@ static gdb_action_t stepi(void *args) {
 static bool set_bp(void *args, size_t addr, bp_type_t type) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
+    if (type != BP_SOFTWARE) {
+        return false;
+    }
+    /*
+    do nohing??
+    */
+
     return true;
 }
 
 static bool del_bp(void *args, size_t addr, bp_type_t type) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
+    /*
+    do nohing??
+    */
+
     return true;
 }
 
 static void on_interrupt(void *args) {
     struct debug_args* debug_args = (struct debug_args*)args;
+    /*
+    exit ??
+    */
+    exit(EXIT_SUCCESS);
 }
 
 arch_info_t arch_info = {
@@ -341,3 +359,19 @@ struct target_ops ops = {
     .del_bp         = del_bp,
     .on_interrupt   = on_interrupt,
 };
+
+
+void debug_start(struct debug_args* debug_args) {
+
+    gdbstub_t gdbstub;
+
+    if (!gdbstub_init(&gdbstub, &ops, arch_info, "127.0.0.1:1234")) {
+        panic("Fail to create socket");
+    }
+
+    if (!gdbstub_run(&gdbstub, (void *)debug_args)) {
+        panic("Fail to run in debug mode");
+    }
+
+    gdbstub_close(&gdbstub);
+}
