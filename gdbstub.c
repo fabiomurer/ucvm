@@ -41,10 +41,53 @@ enum GDB_REGISTER {
     GDB_CPU_X86_64_REG_ES      = 21,
     GDB_CPU_X86_64_REG_FS      = 22,
     GDB_CPU_X86_64_REG_GS      = 23,
-    /* FPU/SSE/AVX registers would follow... */
     
-    GDB_CPU_X86_64_NUM_REGISTERS = 24  /* Base register count without FPU/SIMD */
+    /* FPU registers */
+    GDB_CPU_X86_64_REG_ST0     = 24,
+    GDB_CPU_X86_64_REG_ST1     = 25,
+    GDB_CPU_X86_64_REG_ST2     = 26,
+    GDB_CPU_X86_64_REG_ST3     = 27,
+    GDB_CPU_X86_64_REG_ST4     = 28,
+    GDB_CPU_X86_64_REG_ST5     = 29,
+    GDB_CPU_X86_64_REG_ST6     = 30,
+    GDB_CPU_X86_64_REG_ST7     = 31,
+    
+    GDB_CPU_X86_64_REG_FCTRL   = 32,
+    GDB_CPU_X86_64_REG_FSTAT   = 33,
+    GDB_CPU_X86_64_REG_FTAG    = 34,
+    GDB_CPU_X86_64_REG_FISEG   = 35,
+    GDB_CPU_X86_64_REG_FIOFF   = 36,
+    GDB_CPU_X86_64_REG_FOSEG   = 37,
+    GDB_CPU_X86_64_REG_FOOFF   = 38,
+    GDB_CPU_X86_64_REG_FOP     = 39,
+    
+    /* SSE registers */
+    GDB_CPU_X86_64_REG_XMM0    = 40,
+    GDB_CPU_X86_64_REG_XMM1    = 41,
+    GDB_CPU_X86_64_REG_XMM2    = 42,
+    GDB_CPU_X86_64_REG_XMM3    = 43,
+    GDB_CPU_X86_64_REG_XMM4    = 44,
+    GDB_CPU_X86_64_REG_XMM5    = 45,
+    GDB_CPU_X86_64_REG_XMM6    = 46,
+    GDB_CPU_X86_64_REG_XMM7    = 47,
+    GDB_CPU_X86_64_REG_XMM8    = 48,
+    GDB_CPU_X86_64_REG_XMM9    = 49,
+    GDB_CPU_X86_64_REG_XMM10   = 50,
+    GDB_CPU_X86_64_REG_XMM11   = 51,
+    GDB_CPU_X86_64_REG_XMM12   = 52,
+    GDB_CPU_X86_64_REG_XMM13   = 53,
+    GDB_CPU_X86_64_REG_XMM14   = 54,
+    GDB_CPU_X86_64_REG_XMM15   = 55,
+    
+    /* SSE control/status registers */
+    GDB_CPU_X86_64_REG_MXCSR   = 56,
+    
+    /* Extended registers that may not be used by all GDB versions */
+    /* This is the minimum required by modern GDB */
+    
+    GDB_CPU_X86_64_NUM_REGISTERS = 57
 };
+
 
 static int read_reg(void *args, int regno, size_t *reg_value) {
     struct debug_args* debug_args = (struct debug_args*)args;
@@ -56,6 +99,14 @@ static int read_reg(void *args, int regno, size_t *reg_value) {
     struct kvm_sregs2 sregs;
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
         panic("KVM_GET_SREGS2");
+    }
+
+    // FPU registers need to be fetched separately
+    struct kvm_fpu fpu;
+    if (regno >= GDB_CPU_X86_64_REG_ST0 && regno <= GDB_CPU_X86_64_REG_MXCSR) {
+        if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+            panic("KVM_GET_FPU");
+        }
     }
 
     switch (regno) {
@@ -140,6 +191,75 @@ static int read_reg(void *args, int regno, size_t *reg_value) {
         case GDB_CPU_X86_64_REG_GS:
             *reg_value = sregs.gs.selector;
             return 0;
+
+        /* FPU ST registers - needs special handling for 80-bit format */
+        case GDB_CPU_X86_64_REG_ST0:
+        case GDB_CPU_X86_64_REG_ST1:
+        case GDB_CPU_X86_64_REG_ST2:
+        case GDB_CPU_X86_64_REG_ST3:
+        case GDB_CPU_X86_64_REG_ST4:
+        case GDB_CPU_X86_64_REG_ST5:
+        case GDB_CPU_X86_64_REG_ST6:
+        case GDB_CPU_X86_64_REG_ST7: {
+            // don't read for now
+            *reg_value = 0;
+            return 0;
+        }
+            
+        /* FPU control registers */
+        case GDB_CPU_X86_64_REG_FCTRL:
+            *reg_value = fpu.fcw;
+            return 0;
+        case GDB_CPU_X86_64_REG_FSTAT:
+            *reg_value = fpu.fsw;
+            return 0;
+        case GDB_CPU_X86_64_REG_FTAG:
+            *reg_value = fpu.ftwx;
+            return 0;
+        case GDB_CPU_X86_64_REG_FISEG:
+            /* These registers might not be directly accessible through KVM API */
+            /* Using 0 as a placeholder */
+            *reg_value = 0;
+            return 0;
+        case GDB_CPU_X86_64_REG_FIOFF:
+            *reg_value = 0;
+            return 0;
+        case GDB_CPU_X86_64_REG_FOSEG:
+            *reg_value = 0;
+            return 0;
+        case GDB_CPU_X86_64_REG_FOOFF:
+            *reg_value = 0;
+            return 0;
+        case GDB_CPU_X86_64_REG_FOP:
+            *reg_value = fpu.last_opcode;
+            return 0;
+            
+        /* XMM registers */
+        case GDB_CPU_X86_64_REG_XMM0:
+        case GDB_CPU_X86_64_REG_XMM1:
+        case GDB_CPU_X86_64_REG_XMM2:
+        case GDB_CPU_X86_64_REG_XMM3:
+        case GDB_CPU_X86_64_REG_XMM4:
+        case GDB_CPU_X86_64_REG_XMM5:
+        case GDB_CPU_X86_64_REG_XMM6:
+        case GDB_CPU_X86_64_REG_XMM7:
+        case GDB_CPU_X86_64_REG_XMM8:
+        case GDB_CPU_X86_64_REG_XMM9:
+        case GDB_CPU_X86_64_REG_XMM10:
+        case GDB_CPU_X86_64_REG_XMM11:
+        case GDB_CPU_X86_64_REG_XMM12:
+        case GDB_CPU_X86_64_REG_XMM13:
+        case GDB_CPU_X86_64_REG_XMM14:
+        case GDB_CPU_X86_64_REG_XMM15: {
+            // don't read for now
+            *reg_value = 0;
+            return 0;
+        }
+            
+        /* SSE control/status register */
+        case GDB_CPU_X86_64_REG_MXCSR:
+            *reg_value = fpu.mxcsr;
+            return 0;
             
         default:
             return EFAULT;
@@ -160,6 +280,19 @@ static int write_reg(void *args, int regno, size_t data) {
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
         panic("KVM_GET_SREGS2");
         return EFAULT;
+    }
+    
+    // For FPU registers
+    struct kvm_fpu fpu;
+    int fpu_modified = 0;
+    
+    // Check if we need to fetch the FPU state
+    if (regno >= GDB_CPU_X86_64_REG_ST0 && regno <= GDB_CPU_X86_64_REG_MXCSR) {
+        if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+            panic("KVM_GET_FPU");
+            return EFAULT;
+        }
+        fpu_modified = 1;
     }
     
     int sregs_modified = 0;
@@ -253,6 +386,79 @@ static int write_reg(void *args, int regno, size_t data) {
             sregs_modified = 1;
             break;
             
+        /* FPU ST registers - needs special handling */
+        case GDB_CPU_X86_64_REG_ST0:
+        case GDB_CPU_X86_64_REG_ST1:
+        case GDB_CPU_X86_64_REG_ST2:
+        case GDB_CPU_X86_64_REG_ST3:
+        case GDB_CPU_X86_64_REG_ST4:
+        case GDB_CPU_X86_64_REG_ST5:
+        case GDB_CPU_X86_64_REG_ST6:
+        case GDB_CPU_X86_64_REG_ST7: {
+            // don't set for now
+            fpu_modified = 1;
+            break;
+        }
+            
+        /* FPU control registers */
+        case GDB_CPU_X86_64_REG_FCTRL:
+            fpu.fcw = (uint16_t)data;
+            fpu_modified = 1;
+            break;
+        case GDB_CPU_X86_64_REG_FSTAT:
+            fpu.fsw = (uint16_t)data;
+            fpu_modified = 1;
+            break;
+        case GDB_CPU_X86_64_REG_FTAG:
+            fpu.ftwx = (uint8_t)data;
+            fpu_modified = 1;
+            break;
+        case GDB_CPU_X86_64_REG_FISEG:
+            /* These might not be directly accessible via KVM API */
+            /* Just mark as handled without making changes */
+            break;
+        case GDB_CPU_X86_64_REG_FIOFF:
+            /* Not directly accessible */
+            break;
+        case GDB_CPU_X86_64_REG_FOSEG:
+            /* Not directly accessible */
+            break;
+        case GDB_CPU_X86_64_REG_FOOFF:
+            /* Not directly accessible */
+            break;
+        case GDB_CPU_X86_64_REG_FOP:
+            fpu.last_opcode = (uint16_t)data;
+            fpu_modified = 1;
+            break;
+            
+        /* XMM registers */
+        case GDB_CPU_X86_64_REG_XMM0:
+        case GDB_CPU_X86_64_REG_XMM1:
+        case GDB_CPU_X86_64_REG_XMM2:
+        case GDB_CPU_X86_64_REG_XMM3:
+        case GDB_CPU_X86_64_REG_XMM4:
+        case GDB_CPU_X86_64_REG_XMM5:
+        case GDB_CPU_X86_64_REG_XMM6:
+        case GDB_CPU_X86_64_REG_XMM7:
+        case GDB_CPU_X86_64_REG_XMM8:
+        case GDB_CPU_X86_64_REG_XMM9:
+        case GDB_CPU_X86_64_REG_XMM10:
+        case GDB_CPU_X86_64_REG_XMM11:
+        case GDB_CPU_X86_64_REG_XMM12:
+        case GDB_CPU_X86_64_REG_XMM13:
+        case GDB_CPU_X86_64_REG_XMM14:
+        case GDB_CPU_X86_64_REG_XMM15: {
+            // don't set for now
+            fpu_modified = 1;
+            break;
+        }
+            
+        /* SSE control register */
+        case GDB_CPU_X86_64_REG_MXCSR:
+            fpu.mxcsr = (uint32_t)data;
+            fpu_modified = 1;
+            break;
+            
         default:
             return EFAULT;
     }
@@ -267,6 +473,14 @@ static int write_reg(void *args, int regno, size_t data) {
     if (sregs_modified) {
         if (ioctl(debug_args->vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
             panic("KVM_SET_SREGS2");
+            return EFAULT;
+        }
+    }
+    
+    // Only update FPU state if any FPU registers were modified
+    if (fpu_modified) {
+        if (ioctl(debug_args->vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
+            panic("KVM_SET_FPU");
             return EFAULT;
         }
     }
