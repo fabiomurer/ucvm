@@ -1,3 +1,5 @@
 *.d
 *.o
 ucvm
+compile_commands.json
+.cache
