@@ -174,6 +174,138 @@ static int read_reg(void *args, int regno, void *reg_value) {
             memcpy(reg_value, &regs.rflags, x86_64_reg_size[regno]);
             return 0;
             
+        /* Segment registers */
+        case GDB_CPU_X86_64_REG_CS:
+            memcpy(reg_value, &sregs.cs.selector, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_SS:
+            memcpy(reg_value, &sregs.ss.selector, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_DS:
+            memcpy(reg_value, &sregs.ds.selector, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ES:
+            memcpy(reg_value, &sregs.es.selector, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FS:
+            memcpy(reg_value, &sregs.fs.selector, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_GS:
+            memcpy(reg_value, &sregs.gs.selector, x86_64_reg_size[regno]);
+            return 0;
+            
+        /* FPU ST registers (80-bit floating point) */
+        case GDB_CPU_X86_64_REG_ST0:
+            memcpy(reg_value, &fpu.fpr[0], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST1:
+            memcpy(reg_value, &fpu.fpr[1], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST2:
+            memcpy(reg_value, &fpu.fpr[2], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST3:
+            memcpy(reg_value, &fpu.fpr[3], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST4:
+            memcpy(reg_value, &fpu.fpr[4], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST5:
+            memcpy(reg_value, &fpu.fpr[5], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST6:
+            memcpy(reg_value, &fpu.fpr[6], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_ST7:
+            memcpy(reg_value, &fpu.fpr[7], x86_64_reg_size[regno]);
+            return 0;
+            
+        /* FPU control registers */
+        case GDB_CPU_X86_64_REG_FCTRL:
+            memcpy(reg_value, &fpu.fcw, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FSTAT:
+            memcpy(reg_value, &fpu.fsw, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FTAG:
+            memcpy(reg_value, &fpu.ftwx, x86_64_reg_size[regno]);
+            return 0;
+            case GDB_CPU_X86_64_REG_FISEG:
+            // KVM doesn't expose code segment for FPU, use 0
+            memset(reg_value, 0, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FIOFF:
+            // Use last_ip (instruction pointer)
+            memcpy(reg_value, &fpu.last_ip, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FOSEG:
+            // KVM doesn't expose data segment for FPU, use 0
+            memset(reg_value, 0, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FOOFF:
+            // Use last_dp (data pointer)
+            memcpy(reg_value, &fpu.last_dp, x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_FOP:
+            // Use last_opcode
+            memcpy(reg_value, &fpu.last_opcode, x86_64_reg_size[regno]);
+            return 0;
+            
+        /* SSE registers (XMM) */
+        case GDB_CPU_X86_64_REG_XMM0:
+            memcpy(reg_value, &fpu.xmm[0], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM1:
+            memcpy(reg_value, &fpu.xmm[1], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM2:
+            memcpy(reg_value, &fpu.xmm[2], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM3:
+            memcpy(reg_value, &fpu.xmm[3], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM4:
+            memcpy(reg_value, &fpu.xmm[4], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM5:
+            memcpy(reg_value, &fpu.xmm[5], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM6:
+            memcpy(reg_value, &fpu.xmm[6], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM7:
+            memcpy(reg_value, &fpu.xmm[7], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM8:
+            memcpy(reg_value, &fpu.xmm[8], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM9:
+            memcpy(reg_value, &fpu.xmm[9], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM10:
+            memcpy(reg_value, &fpu.xmm[10], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM11:
+            memcpy(reg_value, &fpu.xmm[11], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM12:
+            memcpy(reg_value, &fpu.xmm[12], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM13:
+            memcpy(reg_value, &fpu.xmm[13], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM14:
+            memcpy(reg_value, &fpu.xmm[14], x86_64_reg_size[regno]);
+            return 0;
+        case GDB_CPU_X86_64_REG_XMM15:
+            memcpy(reg_value, &fpu.xmm[15], x86_64_reg_size[regno]);
+            return 0;
+            
+        /* SSE control register */
+        case GDB_CPU_X86_64_REG_MXCSR:
+            memcpy(reg_value, &fpu.mxcsr, x86_64_reg_size[regno]);
+            return 0;
+            
         /*
         default:
             return EFAULT;
