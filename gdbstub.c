@@ -312,7 +312,9 @@ static int read_mem(void *args, size_t addr, size_t len, void *val) {
     printf("read_mem addr: %p, len: %ld\n", (void*)addr, len);
 
     struct debug_args* debug_args = (struct debug_args*)args;
-    read_buffer_host(debug_args->vm, addr, val, len);
+    if (read_buffer_host(debug_args->vm, addr, val, len) < 0) {
+        return EFAULT;
+    }
     return 0;
 }
 
@@ -320,7 +322,9 @@ static int write_mem(void *args, size_t addr, size_t len, void *val) {
     printf("write_mem addr: %p, len: %ld\n", (void*)addr, len);
 
     struct debug_args* debug_args = (struct debug_args*)args;
-    write_buffer_guest(debug_args->vm, addr, val, len);
+    if (write_buffer_guest(debug_args->vm, addr, val, len) < 0) {
+        return EFAULT;
+    }
     return 0;
 }
 

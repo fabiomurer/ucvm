@@ -4,9 +4,11 @@
 #include <sys/ioctl.h>
 #include <linux/kvm.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 #include "utils.h"
 #include "vsyscall.h"
+#include "guest_inspector.h"
 
 // https://www.sandpile.org/x86/except.htm
 char exceptions_names[][30] = {
@@ -151,12 +153,14 @@ void vcpu_regs_log(struct vm* vm) {
         regs.rflags
     );
 
-    u_int8_t* exec_inst_ptr = (u_int8_t*)vm_guest_to_host(vm, regs.rip);
-    printf("exec_instr: ");
-
-    for (int i = 10; i >= 0; i--) {
-        printf("%X ", exec_inst_ptr[i]);
+    char exec_inst[10];
+    if (read_buffer_host(vm, regs.rip, exec_inst, sizeof(u_int8_t) * 10) < 0) {
+        printf("rip does not point to valid mem");
+    } else  {
+        for (int i = 10; i >= 0; i--) {
+            printf("%X ", exec_inst[i]);
+        }
+    
+        printf("\n");
     }
-
-    printf("\n");
 }

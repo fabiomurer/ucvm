@@ -29,9 +29,12 @@
 
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
 
-	uint8_t* addr = (uint8_t*)vm_guest_to_host(vm, regs->rip); 
+	char inst[2];
+	if (read_buffer_host(vm, regs->rip, inst, sizeof(u_int8_t)*2) < 0) {
+		panic("read_buffer_host");
+	} 
 
-	uint64_t rip_content = addr[1] | (addr[0] << 8);
+	uint64_t rip_content = inst[1] | (inst[0] << 8);
 	if (rip_content == SYSCALL_OPCODE) {
 		return true;
 	} else {
@@ -98,24 +101,32 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 
 	switch (sysno) {
 		case __NR_write:
-			void* buff = vm_guest_to_host(vm, arg2);
+			int fd 			= (int)arg1;
+			uint64_t buff 	= arg2;
+			size_t len		= arg3;
 
 			printf("=======__NR_write\n");
-			printf("fd: %d\n", (int)arg1);
-			printf("buff: %s\n", (char*)buff);
-			printf("len: %lu\n", arg3);
+			printf("fd: %d\n", fd);
+			printf("buff: 0x%lx\n", buff);
+			printf("len: %lu\n", len);
 			printf("=======\n");
 
-			ret = write((int)arg1, (char*)buff, arg3);
+			char* tmp_buff	= malloc(sizeof(char) * len);
+			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
+				panic("read_buffer_host");
+			}
+
+			ret = write((int)arg1, tmp_buff, arg3);
 			if (ret == (u_int64_t)-1) {
 				perror("__NR_write");
 			} else {
 				printf("byte written: %lu\n", ret);
 			}
+			free(tmp_buff);
 			break;
 
 		case __NR_fstat:
-			int fd = (int)arg1;
+			fd = (int)arg1;
 			uint64_t statbuf = arg2;
 			struct stat tmp_statbuf;
 			printf("=======__NR_fstat\n");
@@ -126,7 +137,9 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			if (fstat(fd, &tmp_statbuf) < 0) {
 				ret = -errno;
 			} else {
-				write_buffer_guest(vm, statbuf, &tmp_statbuf, sizeof(tmp_statbuf));
+				if (write_buffer_guest(vm, statbuf, &tmp_statbuf, sizeof(tmp_statbuf)) < 0) {
+					panic("write_buffer_guest");
+				}
 			}
 			break;
 
@@ -194,7 +207,9 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 
 		case __NR_readlinkat:
 			char pathname[PATH_MAX];
-			read_string_host(vm, arg2, pathname, PATH_MAX);
+			if (read_string_host(vm, arg2, pathname, PATH_MAX) < 0) {
+				panic("read_string_host");
+			}
 			int dirfd = (int)arg1;
 			printf("=======__NR_readlinkat\n");
 			printf("dirfd: %d\n", dirfd);
@@ -210,7 +225,9 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				}
 				ret = strlen(buf);
 
-				write_string_guest(vm, arg3, buf, PATH_MAX);
+				if (write_string_guest(vm, arg3, buf, PATH_MAX) < 0) {
+					panic("write_string_guest");
+				}
 				printf("%s\n", buf);
 			} else {
 				panic("__NR_readlinkat case not supported");
@@ -278,7 +295,9 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			if (tbuf == NULL) panic("malloc");
 
 			ret = getrandom(tbuf, buflen, flags);
-			write_buffer_guest(vm, buf, tbuf, buflen);
+			if (write_buffer_guest(vm, buf, tbuf, buflen) < 0) {
+				panic("write_buffer_guest");
+			}
 
 			free(tbuf);
 			break;
