@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
 	if (debug) {
 		struct debug_args debug_args = {
 			.vm = &vm,
-			.linux_proc = &linux_proc
+			.linux_proc = &linux_proc,
+			.breakpoints = {0}
 		};
 
 		vm_set_debug(&vm, true);

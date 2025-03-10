@@ -3,13 +3,16 @@
 #include "vm.h"
 #include "gdbstub.h"
 #include "guest_inspector.h"
+#include <assert.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <linux/kvm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 
 
 #define TARGET_X86_64 \
@@ -440,20 +443,47 @@ static int write_reg(void *args, int regno, void* data) {
     return 0;
 }
 
+int memory_with_breakpoints(struct breakpoint breakpoints[], uint8_t* buff, size_t addr, size_t len) {
+    for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
+        struct breakpoint* bp = &breakpoints[i];
+        // this breakpoint is in that memory -> set it
+        if (bp->addr >= addr && bp->addr < addr + len) {
+            buff[bp->addr] = break_instr;
+        }
+    }
+    return 0;
+}
+
+int memory_without_breakpoints(struct breakpoint breakpoints[], uint8_t* buff, size_t addr, size_t len) {
+    for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
+        struct breakpoint* bp = &breakpoints[i];
+        // this breakpoint is in that memory -> set it
+        if (bp->addr >= addr && bp->addr < addr + len) {
+            buff[bp->addr] = bp->original_data;
+        }
+    }
+    return 0;
+}
+
 static int read_mem(void *args, size_t addr, size_t len, void *val) {
     printf("read_mem addr: %p, len: %ld\n", (void*)addr, len);
-
     struct debug_args* debug_args = (struct debug_args*)args;
+    
     if (read_buffer_host(debug_args->vm, addr, val, len) < 0) {
         return EFAULT;
     }
+
+    memory_without_breakpoints(debug_args->breakpoints, val, addr, len);
+
     return 0;
 }
 
 static int write_mem(void *args, size_t addr, size_t len, void *val) {
     printf("write_mem addr: %p, len: %ld\n", (void*)addr, len);
-
     struct debug_args* debug_args = (struct debug_args*)args;
+
+    memory_with_breakpoints(debug_args->breakpoints, val, addr, len);
+
     if (write_buffer_guest(debug_args->vm, addr, val, len) < 0) {
         return EFAULT;
     }
@@ -494,22 +524,63 @@ static bool set_bp(void *args, size_t addr, bp_type_t type) {
     if (type != BP_SOFTWARE) {
         return false;
     }
-    /*
-    do nohing??
-    */
 
-    return true;
+    for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
+        struct breakpoint* bp = &debug_args->breakpoints[i];
+        // empyt breakpoint found
+        if (bp->addr == 0) {
+            bp->addr = addr;
+
+            // read the origina data
+            int ret = read_buffer_host(
+                debug_args->vm, 
+                addr, 
+                (char*)&(bp->original_data), 
+                sizeof(bp->original_data)
+            );
+            if (ret < 0) return false; // cannot access memory
+
+            // replace it with break_inst
+            ret = write_buffer_guest(
+                debug_args->vm, 
+                addr, 
+                &break_instr, 
+                sizeof(break_instr)
+            );
+            if (ret < 0) return false; // cannot access memory
+
+            return true;
+        }
+    }
+    // max number of breakpoints reached
+    return false;
 }
 
 static bool del_bp(void *args, size_t addr, bp_type_t type) {
     printf("del_bp addr: %p, type: %d\n", (void*)addr, type);
     struct debug_args* debug_args = (struct debug_args*)args;
 
-    /*
-    do nohing??
-    */
+    for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
+        struct breakpoint* bp = &debug_args->breakpoints[i];
+        // breakpoint found
+        if (bp->addr == addr) {
+            bp->addr = 0;
 
-    return true;
+            // restore the instruction
+            int ret = write_buffer_guest(
+                debug_args->vm, 
+                addr, 
+                &bp->original_data, 
+                sizeof(bp->original_data)
+            );
+            if (ret < 0) return false; // cannot access memory
+
+            return true;
+        }
+    }
+
+    // breakpoint does't exisits
+    return false;
 }
 
 static void on_interrupt(void *args) {

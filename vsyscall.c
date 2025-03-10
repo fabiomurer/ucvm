@@ -111,7 +111,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			printf("len: %lu\n", len);
 			printf("=======\n");
 
-			char* tmp_buff	= malloc(sizeof(char) * len);
+			uint8_t* tmp_buff	= malloc(sizeof(uint8_t) * len);
 			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
 				panic("read_buffer_host");
 			}
@@ -137,7 +137,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			if (fstat(fd, &tmp_statbuf) < 0) {
 				ret = -errno;
 			} else {
-				if (write_buffer_guest(vm, statbuf, &tmp_statbuf, sizeof(tmp_statbuf)) < 0) {
+				if (write_buffer_guest(vm, statbuf, (uint8_t*)&tmp_statbuf, sizeof(tmp_statbuf)) < 0) {
 					panic("write_buffer_guest");
 				}
 			}

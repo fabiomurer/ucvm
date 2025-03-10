@@ -1,4 +1,5 @@
 #include <linux/kvm.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,7 +77,7 @@ int write_string_guest(struct vm* vm, uint64_t guest_string_addr, char* buf, siz
 	return 0;
 }
 
-int read_buffer_host(struct vm* vm, uint64_t guest_buffer_addr, char* buf, size_t bufsiz) {
+int read_buffer_host(struct vm* vm, uint64_t guest_buffer_addr, uint8_t* buf, size_t bufsiz) {
     size_t byte_read = 0;
     char* host_addr = NULL;
 
@@ -115,7 +116,7 @@ int read_buffer_host(struct vm* vm, uint64_t guest_buffer_addr, char* buf, size_
     return 0;
 }
 
-int write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, void* buf, size_t bufsiz) {
+int write_buffer_guest(struct vm* vm, uint64_t guest_buffer_addr, uint8_t* buf, size_t bufsiz) {
     size_t byte_written = 0;
     char* host_addr = NULL;
     
