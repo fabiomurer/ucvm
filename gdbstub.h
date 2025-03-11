@@ -5,7 +5,7 @@
 
 #define BREAKPOINTS_MAX_NUM 256
 
-static uint8_t break_instr = 0xcc;
+extern uint8_t break_instr;
 
 struct breakpoint {
   size_t addr;

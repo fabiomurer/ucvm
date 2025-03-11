@@ -1,6 +1,6 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -pedantic -g -std=c23
+CFLAGS = -Wall -Wextra -pedantic -Werror -g -std=c23
 LDFLAGS =
 
 TARGET = ucvm

@@ -29,7 +29,7 @@
 
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
 
-	char inst[2];
+	uint8_t inst[2];
 	if (read_buffer_host(vm, regs->rip, inst, sizeof(u_int8_t)*2) < 0) {
 		panic("read_buffer_host");
 	} 
@@ -96,7 +96,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 	uint64_t arg2 = regs->rsi;
 	uint64_t arg3 = regs->rdx;
 	uint64_t arg4 = regs->r10;
-	uint64_t arg5 = regs->r9;
+	//uint64_t arg5 = regs->r9;
 	uint64_t ret = 0;
 
 	switch (sysno) {
@@ -291,7 +291,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			printf("flags: 0x%d\n", flags);
 			printf("=======\n");
 
-			char* tbuf = malloc(buflen * sizeof(char));
+			uint8_t* tbuf = malloc(buflen * sizeof(char));
 			if (tbuf == NULL) panic("malloc");
 
 			ret = getrandom(tbuf, buflen, flags);

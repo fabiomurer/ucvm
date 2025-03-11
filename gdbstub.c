@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 
+uint8_t break_instr = 0xcc;
 
 #define TARGET_X86_64 \
     "<target version=\"1.0\"><architecture>i386:x86-64</architecture></target>"
@@ -583,9 +584,10 @@ static bool del_bp(void *args, size_t addr, bp_type_t type) {
     return false;
 }
 
-static void on_interrupt(void *args) {
+static void on_interrupt(void *args __attribute__((unused))) {
     printf("on_interrupt\n");
-    struct debug_args* debug_args = (struct debug_args*)args;
+    //struct debug_args* debug_args = (struct debug_args*)args;
+    
     /*
     exit ??
     */

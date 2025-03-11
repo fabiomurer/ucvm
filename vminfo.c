@@ -153,7 +153,7 @@ void vcpu_regs_log(struct vm* vm) {
         regs.rflags
     );
 
-    char exec_inst[10];
+    uint8_t exec_inst[10];
     if (read_buffer_host(vm, regs.rip, exec_inst, sizeof(u_int8_t) * 10) < 0) {
         printf("rip does not point to valid mem");
     } else  {

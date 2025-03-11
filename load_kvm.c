@@ -9,7 +9,10 @@
 #include <string.h>
 #include <unistd.h>
 
-void copy_into_kvm(uint8_t* buffer, uint64_t len, uint64_t start, uint64_t end, char* perms, char* pathname) {
+void copy_into_kvm(uint8_t* buffer, uint64_t len, uint64_t start, 
+    uint64_t end     __attribute__((unused)), 
+    char* perms     __attribute__((unused)), 
+    char* pathname  __attribute__((unused))) {
     // allocating memory
     struct memory_chunk mem = alloc_memory(start, len);
 
