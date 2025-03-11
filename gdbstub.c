@@ -448,7 +448,7 @@ int memory_with_breakpoints(struct breakpoint breakpoints[], uint8_t* buff, size
         struct breakpoint* bp = &breakpoints[i];
         // this breakpoint is in that memory -> set it
         if (bp->addr >= addr && bp->addr < addr + len) {
-            buff[bp->addr] = break_instr;
+            buff[bp->addr - addr] = break_instr;
         }
     }
     return 0;
@@ -459,7 +459,7 @@ int memory_without_breakpoints(struct breakpoint breakpoints[], uint8_t* buff, s
         struct breakpoint* bp = &breakpoints[i];
         // this breakpoint is in that memory -> set it
         if (bp->addr >= addr && bp->addr < addr + len) {
-            buff[bp->addr] = bp->original_data;
+            buff[bp->addr - addr] = bp->original_data;
         }
     }
     return 0;
@@ -535,7 +535,7 @@ static bool set_bp(void *args, size_t addr, bp_type_t type) {
             int ret = read_buffer_host(
                 debug_args->vm, 
                 addr, 
-                (char*)&(bp->original_data), 
+                &bp->original_data, 
                 sizeof(bp->original_data)
             );
             if (ret < 0) return false; // cannot access memory
