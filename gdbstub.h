@@ -16,6 +16,7 @@ struct debug_args {
     struct vm* vm;
     struct linux_proc* linux_proc;
     struct breakpoint breakpoints[BREAKPOINTS_MAX_NUM];
+    uint8_t regs[792];
 };
 
 void debug_start(struct debug_args* debug_args);

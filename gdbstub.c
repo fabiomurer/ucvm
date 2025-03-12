@@ -85,8 +85,27 @@ enum GDB_REGISTER {
     
     /* SSE control/status registers */
     GDB_CPU_X86_64_REG_MXCSR   = 56,
+    
+    /* AVX YMM registers */
+    GDB_CPU_X86_64_REG_YMM0    = 57,
+    GDB_CPU_X86_64_REG_YMM1    = 58,
+    GDB_CPU_X86_64_REG_YMM2    = 59,
+    GDB_CPU_X86_64_REG_YMM3    = 60,
+    GDB_CPU_X86_64_REG_YMM4    = 61,
+    GDB_CPU_X86_64_REG_YMM5    = 62,
+    GDB_CPU_X86_64_REG_YMM6    = 63,
+    GDB_CPU_X86_64_REG_YMM7    = 64,
+    GDB_CPU_X86_64_REG_YMM8    = 65,
+    GDB_CPU_X86_64_REG_YMM9    = 66,
+    GDB_CPU_X86_64_REG_YMM10   = 67,
+    GDB_CPU_X86_64_REG_YMM11   = 68,
+    GDB_CPU_X86_64_REG_YMM12   = 69,
+    GDB_CPU_X86_64_REG_YMM13   = 70,
+    GDB_CPU_X86_64_REG_YMM14   = 71,
+    GDB_CPU_X86_64_REG_YMM15   = 72,
+    
+    GDB_CPU_X86_64_REG_COUNT   = 73
 };
-
 
 static int read_reg(void *args, int regno, void *reg_value) {
     struct debug_args* debug_args = (struct debug_args*)args;
