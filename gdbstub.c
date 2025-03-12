@@ -107,6 +107,195 @@ enum GDB_REGISTER {
     GDB_CPU_X86_64_REG_COUNT   = 73
 };
 
+size_t indexes[] = {
+    0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 
+    80, 88, 96, 104, 112, 120, 128, 136, 
+    140, 144, 148, 152, 156, 160, 164, 174, 
+    184, 194, 204, 214, 224, 234, 244, 248, 
+    252, 256, 260, 264, 268, 272, 276, 292, 
+    308, 324, 340, 356, 372, 388, 404, 420, 
+    436, 452, 468, 484, 500, 516, 532, 536, 
+    552, 568, 584, 600, 616, 632, 648, 664, 
+    680, 696, 712, 728, 744, 760, 776
+};
+
+void read_regs(struct debug_args* debug_args) {
+    struct kvm_regs regs;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+        panic("KVM_GET_REGS");
+    }
+    struct kvm_sregs2 sregs;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
+        panic("KVM_GET_SREGS2");
+    }
+
+    struct kvm_fpu fpu;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+        panic("KVM_GET_FPU");
+    }
+
+    uint8_t* regarray = debug_args->regs;
+
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RAX]],       &regs.rax, x86_64_regs_size[GDB_CPU_X86_64_REG_RAX]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RBX]],       &regs.rbx, x86_64_regs_size[GDB_CPU_X86_64_REG_RBX]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RCX]],       &regs.rcx, x86_64_regs_size[GDB_CPU_X86_64_REG_RCX]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RDX]],       &regs.rdx, x86_64_regs_size[GDB_CPU_X86_64_REG_RDX]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RSI]],       &regs.rsi, x86_64_regs_size[GDB_CPU_X86_64_REG_RSI]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RDI]],       &regs.rdi, x86_64_regs_size[GDB_CPU_X86_64_REG_RDI]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RBP]],       &regs.rbp, x86_64_regs_size[GDB_CPU_X86_64_REG_RBP]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RSP]],       &regs.rsp, x86_64_regs_size[GDB_CPU_X86_64_REG_RSP]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R8]],        &regs.r8, x86_64_regs_size[GDB_CPU_X86_64_REG_R8]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R9]],        &regs.r9, x86_64_regs_size[GDB_CPU_X86_64_REG_R9]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R10]],       &regs.r10, x86_64_regs_size[GDB_CPU_X86_64_REG_R10]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R11]],       &regs.r11, x86_64_regs_size[GDB_CPU_X86_64_REG_R11]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R12]],       &regs.r12, x86_64_regs_size[GDB_CPU_X86_64_REG_R12]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R13]],       &regs.r13, x86_64_regs_size[GDB_CPU_X86_64_REG_R13]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R14]],       &regs.r14, x86_64_regs_size[GDB_CPU_X86_64_REG_R14]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_R15]],       &regs.r15, x86_64_regs_size[GDB_CPU_X86_64_REG_R15]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_RIP]],       &regs.rip, x86_64_regs_size[GDB_CPU_X86_64_REG_RIP]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_EFLAGS]],    &regs.rflags, x86_64_regs_size[GDB_CPU_X86_64_REG_EFLAGS]);  
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_CS]],        &sregs.cs.base, x86_64_regs_size[GDB_CPU_X86_64_REG_CS]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_SS]],        &sregs.ss.base, x86_64_regs_size[GDB_CPU_X86_64_REG_SS]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_DS]],        &sregs.ds.base, x86_64_regs_size[GDB_CPU_X86_64_REG_DS]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ES]],        &sregs.es.base, x86_64_regs_size[GDB_CPU_X86_64_REG_ES]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FS]],        &sregs.fs.base, x86_64_regs_size[GDB_CPU_X86_64_REG_FS]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_GS]],        &sregs.gs.base, x86_64_regs_size[GDB_CPU_X86_64_REG_GS]);      
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST0]],       &fpu.fpr[0], x86_64_regs_size[GDB_CPU_X86_64_REG_ST0]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST1]],       &fpu.fpr[1], x86_64_regs_size[GDB_CPU_X86_64_REG_ST1]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST2]],       &fpu.fpr[2], x86_64_regs_size[GDB_CPU_X86_64_REG_ST2]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST3]],       &fpu.fpr[3], x86_64_regs_size[GDB_CPU_X86_64_REG_ST3]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST4]],       &fpu.fpr[4], x86_64_regs_size[GDB_CPU_X86_64_REG_ST4]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST5]],       &fpu.fpr[5], x86_64_regs_size[GDB_CPU_X86_64_REG_ST5]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST6]],       &fpu.fpr[6], x86_64_regs_size[GDB_CPU_X86_64_REG_ST6]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_ST7]],       &fpu.fpr[7], x86_64_regs_size[GDB_CPU_X86_64_REG_ST7]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FCTRL]],     &fpu.fcw, x86_64_regs_size[GDB_CPU_X86_64_REG_FCTRL]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FSTAT]],     &fpu.fsw, x86_64_regs_size[GDB_CPU_X86_64_REG_FSTAT]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FTAG]],      &fpu.ftwx, x86_64_regs_size[GDB_CPU_X86_64_REG_FTAG]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FIOFF]],     &fpu.last_ip, x86_64_regs_size[GDB_CPU_X86_64_REG_FIOFF]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FOOFF]],     &fpu.last_dp, x86_64_regs_size[GDB_CPU_X86_64_REG_FOOFF]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FOP]],       &fpu.last_opcode, x86_64_regs_size[GDB_CPU_X86_64_REG_FOP]);     
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM0]],      fpu.xmm[0], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM0]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM1]],      fpu.xmm[1], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM1]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM2]],      fpu.xmm[2], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM2]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM3]],      fpu.xmm[3], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM3]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM4]],      fpu.xmm[4], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM4]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM5]],      fpu.xmm[5], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM5]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM6]],      fpu.xmm[6], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM6]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM7]],      fpu.xmm[7], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM7]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM8]],      fpu.xmm[8], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM8]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM9]],      fpu.xmm[9], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM9]);    
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM10]],     fpu.xmm[10], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM10]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM11]],     fpu.xmm[11], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM11]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM12]],     fpu.xmm[12], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM12]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM13]],     fpu.xmm[13], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM13]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM14]],     fpu.xmm[14], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM14]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_XMM15]],     fpu.xmm[15], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM15]);   
+    memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_MXCSR]],     &fpu.mxcsr, x86_64_regs_size[GDB_CPU_X86_64_REG_MXCSR]);
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FISEG]], 0, x86_64_regs_size[GDB_CPU_X86_64_REG_FISEG]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_FOSEG]], 0, x86_64_regs_size[GDB_CPU_X86_64_REG_FOSEG]);
+    //avx512 not supported   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM0]],  fpu.xmm[0], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM0]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM1]],  fpu.xmm[1], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM1]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM2]],  fpu.xmm[2], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM2]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM3]],  fpu.xmm[3], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM3]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM4]],  fpu.xmm[4], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM4]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM5]],  fpu.xmm[5], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM5]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM6]],  fpu.xmm[6], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM6]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM7]],  fpu.xmm[7], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM7]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM8]],  fpu.xmm[8], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM8]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM9]],  fpu.xmm[9], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM9]);    
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM10]], fpu.xmm[10], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM10]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM11]], fpu.xmm[11], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM11]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM12]], fpu.xmm[12], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM12]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM13]], fpu.xmm[13], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM13]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM14]], fpu.xmm[14], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM14]);   
+    //memcpy(&regarray[indexes[GDB_CPU_X86_64_REG_YMM15]], fpu.xmm[15], x86_64_regs_size[GDB_CPU_X86_64_REG_YMM15]);   
+}
+
+void write_regs(struct debug_args* debug_args) {
+    uint8_t* regarray = debug_args->regs;
+
+    struct kvm_regs regs;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+        panic("KVM_GET_REGS");
+    }
+    struct kvm_sregs2 sregs;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
+        panic("KVM_GET_SREGS2");
+    }
+
+    struct kvm_fpu fpu;
+    if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+        panic("KVM_GET_FPU");
+    }
+
+    memcpy(&regs.rax,   &regarray[indexes[GDB_CPU_X86_64_REG_RAX]], x86_64_regs_size[GDB_CPU_X86_64_REG_RAX]);     
+    memcpy(&regs.rbx,   &regarray[indexes[GDB_CPU_X86_64_REG_RBX]], x86_64_regs_size[GDB_CPU_X86_64_REG_RBX]);     
+    memcpy(&regs.rcx,   &regarray[indexes[GDB_CPU_X86_64_REG_RCX]], x86_64_regs_size[GDB_CPU_X86_64_REG_RCX]);     
+    memcpy(&regs.rdx,   &regarray[indexes[GDB_CPU_X86_64_REG_RDX]], x86_64_regs_size[GDB_CPU_X86_64_REG_RDX]);     
+    memcpy(&regs.rsi,   &regarray[indexes[GDB_CPU_X86_64_REG_RSI]], x86_64_regs_size[GDB_CPU_X86_64_REG_RSI]);     
+    memcpy(&regs.rdi,   &regarray[indexes[GDB_CPU_X86_64_REG_RDI]], x86_64_regs_size[GDB_CPU_X86_64_REG_RDI]);     
+    memcpy(&regs.rbp,   &regarray[indexes[GDB_CPU_X86_64_REG_RBP]], x86_64_regs_size[GDB_CPU_X86_64_REG_RBP]);     
+    memcpy(&regs.rsp,   &regarray[indexes[GDB_CPU_X86_64_REG_RSP]], x86_64_regs_size[GDB_CPU_X86_64_REG_RSP]);     
+    memcpy(&regs.r8,    &regarray[indexes[GDB_CPU_X86_64_REG_R8]] , x86_64_regs_size[GDB_CPU_X86_64_REG_R8]);      
+    memcpy(&regs.r9,    &regarray[indexes[GDB_CPU_X86_64_REG_R9]] , x86_64_regs_size[GDB_CPU_X86_64_REG_R9]);      
+    memcpy(&regs.r10,   &regarray[indexes[GDB_CPU_X86_64_REG_R10]], x86_64_regs_size[GDB_CPU_X86_64_REG_R10]);     
+    memcpy(&regs.r11,   &regarray[indexes[GDB_CPU_X86_64_REG_R11]], x86_64_regs_size[GDB_CPU_X86_64_REG_R11]);     
+    memcpy(&regs.r12,   &regarray[indexes[GDB_CPU_X86_64_REG_R12]], x86_64_regs_size[GDB_CPU_X86_64_REG_R12]);     
+    memcpy(&regs.r13,   &regarray[indexes[GDB_CPU_X86_64_REG_R13]], x86_64_regs_size[GDB_CPU_X86_64_REG_R13]);     
+    memcpy(&regs.r14,   &regarray[indexes[GDB_CPU_X86_64_REG_R14]], x86_64_regs_size[GDB_CPU_X86_64_REG_R14]);     
+    memcpy(&regs.r15,   &regarray[indexes[GDB_CPU_X86_64_REG_R15]], x86_64_regs_size[GDB_CPU_X86_64_REG_R15]);     
+    memcpy(&regs.rip,   &regarray[indexes[GDB_CPU_X86_64_REG_RIP]], x86_64_regs_size[GDB_CPU_X86_64_REG_RIP]);     
+    memcpy(&regs.rflags, &regarray[indexes[GDB_CPU_X86_64_REG_EFLAGS]]    , x86_64_regs_size[GDB_CPU_X86_64_REG_EFLAGS]);  
+    memcpy(&sregs.cs.base ,&regarray[indexes[GDB_CPU_X86_64_REG_CS]], x86_64_regs_size[GDB_CPU_X86_64_REG_CS]);      
+    memcpy(&sregs.ss.base ,&regarray[indexes[GDB_CPU_X86_64_REG_SS]], x86_64_regs_size[GDB_CPU_X86_64_REG_SS]);      
+    memcpy(&sregs.ds.base ,&regarray[indexes[GDB_CPU_X86_64_REG_DS]], x86_64_regs_size[GDB_CPU_X86_64_REG_DS]);      
+    memcpy(&sregs.es.base ,&regarray[indexes[GDB_CPU_X86_64_REG_ES]], x86_64_regs_size[GDB_CPU_X86_64_REG_ES]);      
+    memcpy(&sregs.fs.base ,&regarray[indexes[GDB_CPU_X86_64_REG_FS]], x86_64_regs_size[GDB_CPU_X86_64_REG_FS]);      
+    memcpy(&sregs.gs.base ,&regarray[indexes[GDB_CPU_X86_64_REG_GS]], x86_64_regs_size[GDB_CPU_X86_64_REG_GS]);      
+    memcpy(&fpu.fpr[0] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST0]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST0]);     
+    memcpy(&fpu.fpr[1] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST1]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST1]);     
+    memcpy(&fpu.fpr[2] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST2]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST2]);     
+    memcpy(&fpu.fpr[3] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST3]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST3]);     
+    memcpy(&fpu.fpr[4] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST4]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST4]);     
+    memcpy(&fpu.fpr[5] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST5]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST5]);     
+    memcpy(&fpu.fpr[6] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST6]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST6]);     
+    memcpy(&fpu.fpr[7] ,&regarray[indexes[GDB_CPU_X86_64_REG_ST7]], x86_64_regs_size[GDB_CPU_X86_64_REG_ST7]);     
+    memcpy(&fpu.fcw ,&regarray[indexes[GDB_CPU_X86_64_REG_FCTRL]], x86_64_regs_size[GDB_CPU_X86_64_REG_FCTRL]);   
+    memcpy(&fpu.fsw ,&regarray[indexes[GDB_CPU_X86_64_REG_FSTAT]], x86_64_regs_size[GDB_CPU_X86_64_REG_FSTAT]);   
+    memcpy(&fpu.ftwx ,&regarray[indexes[GDB_CPU_X86_64_REG_FTAG]] , x86_64_regs_size[GDB_CPU_X86_64_REG_FTAG]);    
+    memcpy(&fpu.last_ip ,&regarray[indexes[GDB_CPU_X86_64_REG_FIOFF]], x86_64_regs_size[GDB_CPU_X86_64_REG_FIOFF]);   
+    memcpy(&fpu.last_dp ,&regarray[indexes[GDB_CPU_X86_64_REG_FOOFF]], x86_64_regs_size[GDB_CPU_X86_64_REG_FOOFF]);   
+    memcpy(&fpu.last_opcode ,&regarray[indexes[GDB_CPU_X86_64_REG_FOP]]  , x86_64_regs_size[GDB_CPU_X86_64_REG_FOP]);     
+    memcpy(fpu.xmm[0] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM0]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM0]);    
+    memcpy(fpu.xmm[1] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM1]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM1]);    
+    memcpy(fpu.xmm[2] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM2]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM2]);    
+    memcpy(fpu.xmm[3] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM3]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM3]);    
+    memcpy(fpu.xmm[4] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM4]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM4]);    
+    memcpy(fpu.xmm[5] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM5]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM5]);    
+    memcpy(fpu.xmm[6] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM6]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM6]);    
+    memcpy(fpu.xmm[7] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM7]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM7]);    
+    memcpy(fpu.xmm[8] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM8]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM8]);    
+    memcpy(fpu.xmm[9] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM9]] , x86_64_regs_size[GDB_CPU_X86_64_REG_XMM9]);    
+    memcpy(fpu.xmm[10] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM10]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM10]);   
+    memcpy(fpu.xmm[11] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM11]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM11]);   
+    memcpy(fpu.xmm[12] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM12]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM12]);   
+    memcpy(fpu.xmm[13] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM13]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM13]);   
+    memcpy(fpu.xmm[14] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM14]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM14]);   
+    memcpy(fpu.xmm[15] ,&regarray[indexes[GDB_CPU_X86_64_REG_XMM15]], x86_64_regs_size[GDB_CPU_X86_64_REG_XMM15]);   
+    memcpy(&fpu.mxcsr, &regarray[indexes[GDB_CPU_X86_64_REG_MXCSR]], x86_64_regs_size[GDB_CPU_X86_64_REG_MXCSR]);
+
+    if (ioctl(debug_args->vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+        panic("KVM_SET_REGS");
+    }
+    if (ioctl(debug_args->vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
+        panic("KVM_SET_SREGS2");
+    }
+    if (ioctl(debug_args->vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
+        panic("KVM_SET_FPU");
+    }
+}
+
 static int read_reg(void *args, int regno, void *reg_value) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
