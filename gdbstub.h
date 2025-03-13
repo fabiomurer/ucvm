@@ -1,6 +1,8 @@
 #pragma once
 
 #include "mini-gdbstub/include/gdbstub.h"
+#include <asm/kvm.h>
+#include <linux/kvm.h>
 #include <stdint.h>
 
 #define BREAKPOINTS_MAX_NUM 256
@@ -16,7 +18,9 @@ struct debug_args {
     struct vm* vm;
     struct linux_proc* linux_proc;
     struct breakpoint breakpoints[BREAKPOINTS_MAX_NUM];
-    uint8_t regs[792];
+    struct kvm_regs regs;
+    struct kvm_sregs2 sregs;
+    struct kvm_fpu fpu;
 };
 
 void debug_start(struct debug_args* debug_args);

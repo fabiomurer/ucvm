@@ -25,10 +25,11 @@ int main(int argc, char *argv[]) {
     vm_init(&vm);
     vm_load_program(&vm, &linux_proc);
 	if (debug) {
-		struct debug_args debug_args = {0};
-		debug_args.vm = &vm;
-		debug_args.linux_proc = &linux_proc;
-
+		struct debug_args debug_args = {
+			.vm = &vm,
+			.linux_proc = &linux_proc
+		};
+		
 		vm_set_debug(&vm, true);
 		debug_start(&debug_args);
 	} else {
