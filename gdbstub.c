@@ -449,12 +449,12 @@ struct target_ops ops = {
 };
 
 
-void debug_start(struct debug_args* debug_args) {
+void debug_start(char* debug_server, struct debug_args* debug_args) {
     debug_init(debug_args);
 
     gdbstub_t gdbstub;
 
-    if (!gdbstub_init(&gdbstub, &ops, arch_info, "127.0.0.1:1234")) {
+    if (!gdbstub_init(&gdbstub, &ops, arch_info, debug_server)) {
         panic("Fail to create socket");
     }
 

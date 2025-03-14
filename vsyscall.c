@@ -26,6 +26,7 @@
 #include "utils.h"
 #include "vmm.h"
 #include "guest_inspector.h"
+#include "arguments.h"
 
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
 
@@ -90,26 +91,24 @@ uint64_t vlinux_syscall_arch_prctl(struct vm* vm, uint64_t op, uint64_t addr) {
 	return ret;
 }
 
+#define HANDLE_SYSCALL(nr) \
+    case nr: \
+        if (arguments.trace_enabled) {printf(#nr "\n");}
+
 uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kvm_regs* regs) {
 	uint64_t sysno = regs->rax;
 	uint64_t arg1 = regs->rdi;
 	uint64_t arg2 = regs->rsi;
 	uint64_t arg3 = regs->rdx;
-	uint64_t arg4 = regs->r10;
+	//uint64_t arg4 = regs->r10;
 	//uint64_t arg5 = regs->r9;
 	uint64_t ret = 0;
 
 	switch (sysno) {
-		case __NR_write:
+		HANDLE_SYSCALL(__NR_write)
 			int fd 			= (int)arg1;
 			uint64_t buff 	= arg2;
 			size_t len		= arg3;
-
-			printf("=======__NR_write\n");
-			printf("fd: %d\n", fd);
-			printf("buff: 0x%lx\n", buff);
-			printf("len: %lu\n", len);
-			printf("=======\n");
 
 			uint8_t* tmp_buff	= malloc(sizeof(uint8_t) * len);
 			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
@@ -125,14 +124,10 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			free(tmp_buff);
 			break;
 
-		case __NR_fstat:
+		HANDLE_SYSCALL(__NR_fstat)
 			fd = (int)arg1;
 			uint64_t statbuf = arg2;
 			struct stat tmp_statbuf;
-			printf("=======__NR_fstat\n");
-			printf("fd: %d\n", fd);
-			printf("statbuf: %p\n", (void*)statbuf);
-			printf("=======\n");
 
 			if (fstat(fd, &tmp_statbuf) < 0) {
 				ret = -errno;
@@ -143,47 +138,22 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 			break;
 
-		case __NR_mprotect:
-			void* addr = (void*)arg1;
-			size_t size = arg2;
-			int proto = (int)arg3;
-			printf("=======__NR_mprotect\n");
-			printf("addr: %p\n", addr);
-			printf("size: %ld\n", size);
-			printf("proto: %d\n", proto);
-			// for now not support memory protection
-			printf("SYSCALL IGNORED\n");
-			printf("=======\n");
-			ret = 0;
+		HANDLE_SYSCALL(__NR_mprotect)
 			break;
 
-		case __NR_brk:
-			printf("=======__NR_brk\n");
-			printf("addr: %p\n", (void*)arg1);
-			printf("=======\n");
+		HANDLE_SYSCALL(__NR_brk)
 			ret = vlinux_syscall_brk(linux_proc, arg1);
 			break;
 
-		case __NR_exit:
-			printf("=======__NR_exit\n");
-			printf("exit code: %d\n", (int)arg1);
-			printf("=======\n");
+		HANDLE_SYSCALL(__NR_exit)
 			_exit(arg1);
 			break;
 		
-		case __NR_arch_prctl:
-			printf("=======__NR_arch_prctl\n");
-			printf("op: %d\n", (int)arg1);
-			printf("add: %p\n", (void*)arg2);
-			printf("=======\n");
+		HANDLE_SYSCALL(__NR_arch_prctl)
 			ret = vlinux_syscall_arch_prctl(vm, arg1, arg2);
 			break;
 
-		case __NR_set_tid_address:
-			printf("=======__NR_set_tid_address\n");
-			printf("tidptr: %p\n", (void*)arg1);
-			printf("=======\n");
-
+		HANDLE_SYSCALL(__NR_set_tid_address)
 			/*
 			The system call set_tid_address() sets the clear_child_tid value
 			for the calling thread to tidptr.
@@ -197,25 +167,17 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			ret = 0;
 			break;
 
-		case __NR_exit_group:
+		HANDLE_SYSCALL(__NR_exit_group)
 			int status = (int)arg1;
-			printf("=======__NR_exit_group\n");
-			printf("status: %d\n", status);
-			printf("=======\n");
 			syscall(SYS_exit_group, status);
 			break;
 
-		case __NR_readlinkat:
+		HANDLE_SYSCALL(__NR_readlinkat)
 			char pathname[PATH_MAX];
 			if (read_string_host(vm, arg2, pathname, PATH_MAX) < 0) {
 				panic("read_string_host");
 			}
 			int dirfd = (int)arg1;
-			printf("=======__NR_readlinkat\n");
-			printf("dirfd: %d\n", dirfd);
-			printf("pathname: %s\n", pathname);
-			printf("bufsiz: %lu\n", arg4);
-			printf("=======\n");
 
 			// support only get process path
 			if (strcmp("/proc/self/exe", pathname) == 0 && dirfd == AT_FDCWD) {
@@ -235,12 +197,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 			break;
 		
-		case __NR_set_robust_list:
-			printf("=======__NR_set_robust_list\n");
-			printf("head_ptr: %p\n", (void*)arg1);
-			printf("sizep: %lu\n", arg2);
-			printf("=======\n");
-
+		HANDLE_SYSCALL(__NR_set_robust_list)
 			/*
 			The set_robust_list() system call requests the kernel to record
        		the head of the list of robust futexes owned by the calling
@@ -255,24 +212,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 			break;
 		
-		case __NR_prlimit64:
-			/*
-			int prlimit(pid_t pid, int resource,
-                   const struct rlimit *_Nullable new_limit,
-                   struct rlimit *_Nullable old_limit);
-
-       		struct rlimit {
-       		    rlim_t  rlim_cur;  //Soft limit 
-       		    rlim_t  rlim_max;  // Hard limit (ceiling for rlim_cur)
-       		};
-			*/
-			printf("=======__NR_prlimit64\n");
-			printf("pid: %ld\n", arg1);
-			printf("resource: %ld\n", arg2);
-			printf("new_limit: %p\n", (void*)arg3);
-			printf("old_limit: %p\n", (void*)arg4);
-			printf("=======\n");
-
+		HANDLE_SYSCALL(__NR_prlimit64)
 			if (arg1 == 0 && arg2 == RLIMIT_STACK) {
 				// for vm no limit for stack-> do nothing
 				ret = 0;
@@ -281,15 +221,10 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 			break;
 
-		case __NR_getrandom:
+		HANDLE_SYSCALL(__NR_getrandom)
 			uint64_t buf = arg1;
 			size_t buflen = arg2;
 			unsigned int flags = arg3;
-			printf("=======__NR_getrandom\n");
-			printf("buf: %p\n", (void*)buf);
-			printf("buflen: %ld\n", buflen);
-			printf("flags: 0x%d\n", flags);
-			printf("=======\n");
 
 			uint8_t* tbuf = malloc(buflen * sizeof(char));
 			if (tbuf == NULL) panic("malloc");
@@ -304,10 +239,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 
 		
 		// https://manpages.opensuse.org/Tumbleweed/librseq-devel/rseq.2.en.html
-		case __NR_rseq: // what is this?? not implemented -> hopefully not used
-			printf("=======__NR_rseq\n");
-			printf("SYSCALL IGNORED\n");
-			printf("=======\n");
+		HANDLE_SYSCALL(__NR_rseq) // what is this?? not implemented -> hopefully not used
 			ret = 0;
 			break;
 

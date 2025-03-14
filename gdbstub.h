@@ -23,4 +23,4 @@ struct debug_args {
     struct kvm_fpu fpu;
 };
 
-void debug_start(struct debug_args* debug_args);
+void debug_start(char* debug_server, struct debug_args* debug_args);
