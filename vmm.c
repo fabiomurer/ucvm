@@ -280,7 +280,10 @@ struct memory_chunk from_guest(uint64_t gaddr) {
 // set 4 level page table for address translation
 void map_addr(uint64_t vaddr, uint64_t phys_addr)
 {
+	#ifdef DEBUG
 	printf("Mapping %lx to %lx\n", vaddr, phys_addr);
+	#endif
+
 	size_t i = 0;
 	struct memory_chunk cur_addr = pml4t_addr;
 	uint64_t ind[PAGE_TABLE_LEVELS] = {
@@ -311,7 +314,9 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 		}
 		// if the part of the current level is not mapped, map it
 		if (!*g_a) {
+			#ifdef DEBUG
 			printf("Allocating level %zu\n", i);
+			#endif
 			*g_a = get_free_memory_chunk(1).guest | (PAGE_PRESENT | PAGE_RW);
 		}
 		cur_addr = from_guest(*g_a);
@@ -352,13 +357,18 @@ bool segment_already_mapped(uint64_t vaddr) {
 void map_range(uint64_t vaddr, uint64_t phys_addr, size_t pages_count)
 {
 	size_t mapped;
+
+	#ifdef DEBUG
 	printf("Mapping range from %lx to %lx\n", vaddr, vaddr + pages_count * PAGE_SIZE);
+	#endif
 
 	for (mapped = 0; mapped < pages_count; mapped++) {
 		if (!segment_already_mapped(vaddr)) {
 			map_addr(vaddr, phys_addr);
 		} else {
+			#ifdef DEBUG
 			fprintf(stderr, "segment already mapped\n");
+			#endif
 		}
 		vaddr += PAGE_SIZE;
 		phys_addr += PAGE_SIZE;

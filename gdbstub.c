@@ -253,7 +253,9 @@ void* regptr(int regno, struct debug_args* debug_args) {
 static int read_reg(void *args, int regno, void *reg_value) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
+#ifdef DEBUG
     printf("read_reg regno: %d\n", regno);
+#endif
 
     if (regno >= GDB_CPU_X86_64_REG_COUNT) return EFAULT;
 
@@ -270,8 +272,10 @@ static int read_reg(void *args, int regno, void *reg_value) {
 static int write_reg(void *args, int regno, void* data) {
     struct debug_args* debug_args = (struct debug_args*)args;
 
+#ifdef DEBUG
     printf("write_reg regno: %d\n", regno);
-    
+#endif
+
     if (regno >= GDB_CPU_X86_64_REG_COUNT) return EFAULT;
 
     void* reg_ptr = regptr(regno, debug_args);
@@ -307,7 +311,10 @@ int memory_without_breakpoints(struct breakpoint breakpoints[], uint8_t* buff, s
 }
 
 static int read_mem(void *args, size_t addr, size_t len, void *val) {
+#ifdef DEBUG
     printf("read_mem addr: %p, len: %ld\n", (void*)addr, len);
+#endif
+
     struct debug_args* debug_args = (struct debug_args*)args;
     
     if (read_buffer_host(debug_args->vm, addr, val, len) < 0) {
@@ -320,7 +327,9 @@ static int read_mem(void *args, size_t addr, size_t len, void *val) {
 }
 
 static int write_mem(void *args, size_t addr, size_t len, void *val) {
+#ifdef DEBUG
     printf("write_mem addr: %p, len: %ld\n", (void*)addr, len);
+#endif
     struct debug_args* debug_args = (struct debug_args*)args;
 
     memory_with_breakpoints(debug_args->breakpoints, val, addr, len);
@@ -332,7 +341,9 @@ static int write_mem(void *args, size_t addr, size_t len, void *val) {
 }
 
 static gdb_action_t cont(void *args) {
+#ifdef DEBUG
     printf("continue\n");
+#endif
 
     struct debug_args* debug_args = (struct debug_args*)args;
 
@@ -342,7 +353,9 @@ static gdb_action_t cont(void *args) {
 }
 
 static gdb_action_t stepi(void *args) {
+#ifdef DEBUG
     printf("stepi\n");
+#endif
     struct debug_args* debug_args = (struct debug_args*)args;
 
     vm_set_debug_step(debug_args->vm, true);
@@ -353,7 +366,9 @@ static gdb_action_t stepi(void *args) {
 }
 
 static bool set_bp(void *args, size_t addr, bp_type_t type) {
+#ifdef DEBUG
     printf("set_bp addr: %p, type: %d\n", (void*)addr, type);
+#endif
     struct debug_args* debug_args = (struct debug_args*)args;
 
     if (type != BP_SOFTWARE) {
@@ -391,8 +406,10 @@ static bool set_bp(void *args, size_t addr, bp_type_t type) {
     return false;
 }
 
-static bool del_bp(void *args, size_t addr, bp_type_t type) {
+static bool del_bp(void *args, size_t addr, bp_type_t type __attribute__((unused))) {
+#ifdef DEBUG
     printf("del_bp addr: %p, type: %d\n", (void*)addr, type);
+#endif
     struct debug_args* debug_args = (struct debug_args*)args;
 
     for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
@@ -419,7 +436,9 @@ static bool del_bp(void *args, size_t addr, bp_type_t type) {
 }
 
 static void on_interrupt(void *args __attribute__((unused))) {
+#ifdef DEBUG
     printf("on_interrupt\n");
+#endif
     //struct debug_args* debug_args = (struct debug_args*)args;
     
     /*

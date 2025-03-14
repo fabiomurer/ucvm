@@ -116,11 +116,6 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			}
 
 			ret = write((int)arg1, tmp_buff, arg3);
-			if (ret == (u_int64_t)-1) {
-				perror("__NR_write");
-			} else {
-				printf("byte written: %lu\n", ret);
-			}
 			free(tmp_buff);
 			break;
 
@@ -190,7 +185,6 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				if (write_string_guest(vm, arg3, buf, PATH_MAX) < 0) {
 					PANIC("write_string_guest");
 				}
-				printf("%s\n", buf);
 			} else {
 				PANIC("__NR_readlinkat case not supported");
 				ret = -1;
@@ -244,7 +238,9 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			break;
 
 		default:
+			#ifdef DEBUG
 			printf("ENOSYS, syscall number %d\n", (int)sysno);
+			#endif
 			ret = -ENOSYS;
 			sysno = ENOSYS; // return syscall not recognised
 	}

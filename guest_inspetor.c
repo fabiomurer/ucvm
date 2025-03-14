@@ -8,22 +8,6 @@
 #include "vmm.h"
 #include "guest_inspector.h"
 
-/*void* vm_guest_to_host(struct vm* vm, u_int64_t guest_addr) {
-	struct kvm_translation transl_addr;
-	transl_addr.linear_address = guest_addr;
-
-	if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
-		panic("KVM_TRANSLATE");
-	}
-
-	if (transl_addr.valid == 0) {
-		fprintf(stderr, "KVM_TRANSLATE address: %p not valid\n", (void*)guest_addr);
-		exit(EXIT_FAILURE);
-	}
-
-	return (void*)((uint64_t)vm->memory + transl_addr.physical_address - GUEST_PHYS_ADDR);
-}*/
-
 int vm_guest_to_host(struct vm* vm, u_int64_t guest_addr, void** host_addr) {
 	struct kvm_translation transl_addr;
 	transl_addr.linear_address = guest_addr;

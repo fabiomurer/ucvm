@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+
+#include "utils.h"
 #include "load_kvm.h"
 #include "vmm.h"
 #include <errno.h>
@@ -33,16 +35,14 @@ void load_kvm(pid_t pid) {
 
     FILE* maps_file = fopen(maps_path, "r");
     if (!maps_file) {
-        perror("Failed to open maps file");
-        exit(EXIT_FAILURE);
+        PANIC_PERROR("fopen");
     }
 
     char mem_path[PATH_MAX] = {0};
     snprintf(mem_path, sizeof(mem_path), "/proc/%s/mem", pid_string);
     int mem_fd = open(mem_path, O_RDONLY);
     if (mem_fd < 0) {
-        perror("Failed to open mem file");
-        exit(EXIT_FAILURE);
+        PANIC_PERROR("open");
     }
 
     char line[LINE_SIZE];
@@ -69,19 +69,22 @@ void load_kvm(pid_t pid) {
 
         // Allocate a buffer to hold the segment's memory.
         u_int8_t* buffer = malloc(segment_size);
-        if (!buffer) {
-            fprintf(stderr, "malloc failed for segment size %zu\n", segment_size);
-            continue;
+        if (buffer == NULL) {
+            PANIC_PERROR("malloc");
         }
 
         // Read the segment from the process's memory.
         ssize_t read_bytes = pread(mem_fd, buffer, segment_size, start);
         if (read_bytes < 0) {
+            #ifdef DEBUG
             fprintf(stderr, "Failed to read memory from 0x%lx to 0x%lx: %s\n", start, end, strerror(errno));
             // fill buffer with zeros
+            #endif
             memset(buffer, 0, segment_size);
         } else {
+            #ifdef DEBUG
             printf("Extracted segment 0x%lx-0x%lx (%ld bytes)\n", start, end, (long)read_bytes);
+            #endif
         }
 
         copy_into_kvm(buffer, segment_size, start, end, perms, pathname);

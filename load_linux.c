@@ -218,9 +218,7 @@ int read_proc_info(int pid, struct linux_proc_info* proc_info) {
     );
 
     if (ret != 52) {
-        free(buffer);
-        fprintf(stderr, "Error: sscanf expected 52 fields but got %d\n", ret);
-        exit(EXIT_FAILURE);
+        PANIC("sscanf");
     }
 
     free(buffer);
@@ -304,8 +302,7 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
         }
 
         if (!WIFSTOPPED(status)) {
-            fprintf(stderr, "Child did not stop as expected.\n");
-            exit(EXIT_FAILURE);
+            PANIC("Child did not stop as expected.");
         }
         
         // Set options to catch exec event.
@@ -325,7 +322,9 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
 
         // Check if this stop is due to the exec event.
         if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP && (status >> 16) == PTRACE_EVENT_EXEC) {
+            #ifdef DEBUG
             printf("process with pid: %d is loaded and stopped\n", child);
+            #endif
 
             // disable VDSO
             remove_vdso(child);
@@ -345,8 +344,7 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
             linux_proc->rsp = user_regs.rsp;
             
         } else {
-            fprintf(stderr, "Unexpected stop before exec event occurred.\n");
-            exit(EXIT_FAILURE);
+            PANIC("Unexpected stop before exec event occurred.");
         }
     }
 }
