@@ -140,7 +140,7 @@ void vcpu_events_logs(struct vm* vm) {
 void vcpu_regs_log(struct vm* vm) {
     struct kvm_regs regs;
 	if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-		panic("KVM_GET_REGS");
+		PANIC_PERROR("KVM_GET_REGS");
 	}
 
     printf(

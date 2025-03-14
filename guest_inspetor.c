@@ -29,7 +29,7 @@ int vm_guest_to_host(struct vm* vm, u_int64_t guest_addr, void** host_addr) {
 	transl_addr.linear_address = guest_addr;
 
 	if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
-		panic("KVM_TRANSLATE");
+		PANIC_PERROR("KVM_TRANSLATE");
 	}
 
 	if (transl_addr.valid == 0) {

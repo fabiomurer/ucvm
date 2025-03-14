@@ -112,26 +112,26 @@ void debug_init(struct debug_args* debug_args) {
     memset(debug_args->breakpoints, 0, sizeof(debug_args->breakpoints));
     // read all registers
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &debug_args->regs) < 0) {
-        panic("KVM_GET_REGS");
+        PANIC_PERROR("KVM_GET_REGS");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &debug_args->sregs) < 0) {
-        panic("KVM_GET_SREGS2");
+        PANIC_PERROR("KVM_GET_SREGS2");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &debug_args->fpu) < 0) {
-        panic("KVM_GET_FPU");
+        PANIC_PERROR("KVM_GET_FPU");
     }
 }
 
 void debug_cycle(struct debug_args* debug_args) {
     // write all registers
     if (ioctl(debug_args->vm->vcpufd, KVM_SET_REGS, &debug_args->regs) < 0) {
-        panic("KVM_SET_REGS");
+        PANIC_PERROR("KVM_SET_REGS");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_SET_SREGS2, &debug_args->sregs) < 0) {
-        panic("KVM_SET_SREGS2");
+        PANIC_PERROR("KVM_SET_SREGS2");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_SET_FPU, &debug_args->fpu) < 0) {
-        panic("KVM_SET_FPU");
+        PANIC_PERROR("KVM_SET_FPU");
     }
 
     int exit_code;
@@ -141,13 +141,13 @@ void debug_cycle(struct debug_args* debug_args) {
     
     // read all registers
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_REGS, &debug_args->regs) < 0) {
-        panic("KVM_GET_REGS");
+        PANIC_PERROR("KVM_GET_REGS");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_SREGS2, &debug_args->sregs) < 0) {
-        panic("KVM_GET_SREGS2");
+        PANIC_PERROR("KVM_GET_SREGS2");
     }
     if (ioctl(debug_args->vm->vcpufd, KVM_GET_FPU, &debug_args->fpu) < 0) {
-        panic("KVM_GET_FPU");
+        PANIC_PERROR("KVM_GET_FPU");
     }
 }
 
@@ -455,11 +455,11 @@ void debug_start(char* debug_server, struct debug_args* debug_args) {
     gdbstub_t gdbstub;
 
     if (!gdbstub_init(&gdbstub, &ops, arch_info, debug_server)) {
-        panic("Fail to create socket");
+        PANIC("Fail to create socket");
     }
 
     if (!gdbstub_run(&gdbstub, (void *)debug_args)) {
-        panic("Fail to run in debug mode");
+        PANIC("Fail to run in debug mode");
     }
 
     gdbstub_close(&gdbstub);

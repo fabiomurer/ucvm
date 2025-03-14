@@ -31,36 +31,36 @@ struct vm vm_create(void) {
 
     // connect to kvm
     if ((vm.kvmfd = open(KVM_DEVICE, O_RDWR | O_CLOEXEC)) < 0) {
-        panic("Failed to open " KVM_DEVICE);
+        PANIC_PERROR("Failed to open " KVM_DEVICE);
     }
 
     // Check KVM API version
     int api_version = ioctl(vm.kvmfd, KVM_GET_API_VERSION, 0);
-    if (api_version == -1) panic("KVM_GET_API_VERSION");
+    if (api_version == -1) PANIC_PERROR("KVM_GET_API_VERSION");
     if (api_version != 12) { 
-        panic("KVM API version not supported");
+        PANIC("KVM API version not supported");
     }
 
     // create a vm
     if ((vm.vmfd = ioctl(vm.kvmfd, KVM_CREATE_VM, 0)) < 0) {
-        panic("KVM_CREATE_VM");
+        PANIC_PERROR("KVM_CREATE_VM");
     }
 
     // create vcpu
     ssize_t vcpu_mmap_size;
     if ((vcpu_mmap_size = ioctl(vm.kvmfd, KVM_GET_VCPU_MMAP_SIZE, 0)) <= 0) {
-        panic("KVM_GET_VCPU_MMAP_SIZE");
+        PANIC_PERROR("KVM_GET_VCPU_MMAP_SIZE");
     }
 
     if ((vm.vcpufd = ioctl(vm.vmfd, KVM_CREATE_VCPU, 0)) < 0) {
-        panic("KVM_CREATE_VCPU");
+        PANIC_PERROR("KVM_CREATE_VCPU");
     }
 
     if ((vm.run = mmap(NULL, vcpu_mmap_size, 
             PROT_READ | PROT_WRITE, 
             MAP_SHARED, 
             vm.vcpufd, 0)) == MAP_FAILED) {
-        panic("MMAP");
+        PANIC_PERROR("MMAP");
     }
 
     // create memory
@@ -70,7 +70,7 @@ struct vm vm_create(void) {
                 MAP_SHARED | MAP_ANONYMOUS, 
                 -1, 0)
             ) == MAP_FAILED) {
-        panic("MMAP");
+        PANIC_PERROR("MMAP");
     }
     memset(vm.memory, 0, MEMORY_SIZE); // ?
 
@@ -83,7 +83,7 @@ struct vm vm_create(void) {
     };
 
     if (ioctl(vm.vmfd, KVM_SET_USER_MEMORY_REGION, &region) < 0) {
-        panic("KVM_SET_USER_MEMORY_REGION");
+        PANIC_PERROR("KVM_SET_USER_MEMORY_REGION");
     }
 
     return vm;
@@ -97,7 +97,7 @@ void cpu_init_cpuid(struct vm* vm) {
     cpuid->nent = max_entries;
 
     if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, cpuid) < 0) {
-        panic("KVM_GET_SUPPORTED_CPUID");
+        PANIC_PERROR("KVM_GET_SUPPORTED_CPUID");
     }
 
     /*
@@ -118,7 +118,7 @@ void cpu_init_cpuid(struct vm* vm) {
     }
 
     if (ioctl(vm->vcpufd, KVM_SET_CPUID2, cpuid) < 0) {
-        panic("KVM_SET_CPUID2");
+        PANIC_PERROR("KVM_SET_CPUID2");
     }
 }
 
@@ -186,16 +186,16 @@ void vm_init(struct vm* vm) {
     struct kvm_xcrs xcrs;
 
     if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-        panic("KVM_GET_REGS");
+        PANIC_PERROR("KVM_GET_REGS");
     }
     if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
-        panic("KVM_GET_SREGS2");
+        PANIC_PERROR("KVM_GET_SREGS2");
     }
     if (ioctl(vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
-        panic("KVM_GET_FPU");
+        PANIC_PERROR("KVM_GET_FPU");
     }
     if (ioctl(vm->vcpufd, KVM_GET_XCRS, &xcrs) < 0) {
-        panic("KVM_GET_XCRS");
+        PANIC_PERROR("KVM_GET_XCRS");
     }
 
     cpu_init_long(&sregs, vm->memory);
@@ -207,16 +207,16 @@ void vm_init(struct vm* vm) {
     cpu_init_xcrs(&xcrs);
     
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
-        panic("KVM_SET_REGS");
+        PANIC_PERROR("KVM_SET_REGS");
     }
     if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
-        panic("KVM_SET_SREGS2");
+        PANIC_PERROR("KVM_SET_SREGS2");
     }
     if (ioctl(vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
-        panic("KVM_SET_FPU");
+        PANIC_PERROR("KVM_SET_FPU");
     }
     if (ioctl(vm->vcpufd, KVM_SET_XCRS, &xcrs) < 0) {
-        panic("KVM_SET_XCRS");
+        PANIC_PERROR("KVM_SET_XCRS");
     }
 }
 
@@ -229,14 +229,14 @@ void vm_set_debug(struct vm* vm, bool enable_debug) {
     }
 
     if (ioctl(vm->vcpufd, KVM_SET_GUEST_DEBUG, &vm->guest_debug) < 0) {
-		panic("KVM_SET_GUEST_DEBUG");
+		PANIC_PERROR("KVM_SET_GUEST_DEBUG");
 	}
     vm->debug_enabled = enable_debug;
 }
 
 void vm_set_debug_step(struct vm* vm, bool enable_step) {
     if (!vm->debug_enabled) {
-        panic("cannot step if debug is disabled");
+        PANIC("cannot step if debug is disabled");
     }
 
     if (enable_step) {
@@ -246,7 +246,7 @@ void vm_set_debug_step(struct vm* vm, bool enable_step) {
     }
 
     if (ioctl(vm->vcpufd, KVM_SET_GUEST_DEBUG, &vm->guest_debug) < 0) {
-		panic("KVM_SET_GUEST_DEBUG");
+		PANIC_PERROR("KVM_SET_GUEST_DEBUG");
 	}
 }
 
@@ -256,14 +256,14 @@ void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
     // update vcpu
     struct kvm_regs regs;
     if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-        panic("KVM_GET_REGS");
+        PANIC_PERROR("KVM_GET_REGS");
     }
 
     regs.rip = linux_proc->rip;
     regs.rsp = linux_proc->rsp;
 
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
-        panic("KVM_SET_REGS");
+        PANIC_PERROR("KVM_SET_REGS");
     }
 
     load_kvm(linux_proc->pid);
@@ -281,7 +281,7 @@ void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
 int vm_run(struct vm* vm) {
     
     if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
-        panic("KVM_RUN");
+        PANIC_PERROR("KVM_RUN");
     }
 
     return vm->run->exit_reason;
@@ -312,7 +312,7 @@ void vm_exit_handler(int exit_code, struct vm* vm, struct linux_proc* linux_proc
 	case KVM_EXIT_SHUTDOWN:
 		struct kvm_regs regs;
 		if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-			panic("KVM_GET_REGS");
+			PANIC_PERROR("KVM_GET_REGS");
 		}
 		if (is_syscall(vm, &regs)) {
 			

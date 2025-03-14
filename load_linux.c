@@ -84,7 +84,7 @@ int read_proc_info(int pid, struct linux_proc_info* proc_info) {
     // Obtain the file size using stat
     struct stat st;
     if (stat(stat_path, &st) < 0) {
-        panic("stat");
+        PANIC_PERROR("stat");
     }
     // Many /proc files report 0 as the size; use a fallback if necessary.
     size_t file_size = st.st_size;
@@ -94,16 +94,16 @@ int read_proc_info(int pid, struct linux_proc_info* proc_info) {
 
     // Allocate buffer based on file size
     char *buffer = malloc(file_size + 1);
-    if (buffer == NULL) panic("malloc");
+    if (buffer == NULL) PANIC_PERROR("malloc");
     
 
     FILE *fp = fopen(stat_path, "r");
-    if (fp == NULL) panic("fopen");
+    if (fp == NULL) PANIC_PERROR("fopen");
     
 
     // Read the file into the buffer
     size_t bytes_read = fread(buffer, 1, file_size, fp);
-    if (bytes_read == 0) panic("fread");
+    if (bytes_read == 0) PANIC_PERROR("fread");
     
     buffer[bytes_read] = '\0';  // Null-terminate the string
     fclose(fp);
@@ -235,7 +235,7 @@ void remove_vdso(int pid) {
     // get rsp value, rsp is at the start of stack because program is just sarted execution
     errno = 0; // clear errno
     size_t pos = (size_t)ptrace(PTRACE_PEEKUSER, pid, WORDLEN * RSP, NULL);
-    if (errno != 0) panic("ptrace(PTRACE_PEEKUSER)");
+    if (errno != 0) PANIC_PERROR("ptrace(PTRACE_PEEKUSER)");
     
   
     // go to the auxiliary vector, auxvt start after two nulls
@@ -243,7 +243,7 @@ void remove_vdso(int pid) {
     while (zeroCount < 2) {
         errno = 0; // clear errno
         val = ptrace(PTRACE_PEEKDATA, pid, pos += WORDLEN, NULL);
-        if (errno != 0) panic("ptrace(PTRACE_PEEKDATA)");
+        if (errno != 0) PANIC_PERROR("ptrace(PTRACE_PEEKDATA)");
 
         if (val == AT_NULL) zeroCount++;
     }
@@ -251,7 +251,7 @@ void remove_vdso(int pid) {
     // search the auxiliary vector for AT_SYSINFO_EHDR
     errno = 0; // clear errno
     val = ptrace(PTRACE_PEEKDATA, pid, pos += WORDLEN, NULL);
-    if (errno != 0) panic("ptrace(PTRACE_PEEKDATA)");
+    if (errno != 0) PANIC_PERROR("ptrace(PTRACE_PEEKDATA)");
 
     while(true) {
         if (val == AT_NULL)
@@ -259,13 +259,13 @@ void remove_vdso(int pid) {
             break;
         if (val == AT_SYSINFO_EHDR) {
             // found it, make it invalid
-            if (ptrace(PTRACE_POKEDATA, pid, pos, AT_IGNORE) == -1) panic("ptrace(PTRACE_POKEDATA)");
+            if (ptrace(PTRACE_POKEDATA, pid, pos, AT_IGNORE) == -1) PANIC_PERROR("ptrace(PTRACE_POKEDATA)");
             break;
         }
       
         errno = 0; // clear errno
         val = ptrace(PTRACE_PEEKDATA, pid, pos += sizeof(Elf64_auxv_t), NULL);
-        if (errno != 0) panic("ptrace(PTRACE_PEEKDATA)");
+        if (errno != 0) PANIC_PERROR("ptrace(PTRACE_PEEKDATA)");
     }
 }
 
@@ -275,20 +275,20 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
     pid_t child = fork();
 
     if (child == -1) {
-        panic("fork");
+        PANIC_PERROR("fork");
     }
 
     if (child == 0) {
         // Child process: request tracing and stop itself so the parent can attach.
         if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1) {
-            panic("ptrace(PTRACE_TRACEME)");
+            PANIC_PERROR("ptrace(PTRACE_TRACEME)");
         }
         // Stop so the parent can set options.
         raise(SIGSTOP);
         
         // disable address randomization
         if (personality(ADDR_NO_RANDOMIZE) == -1) {
-            panic("personality(ADDR_NO_RANDOMIZE)");
+            PANIC_PERROR("personality(ADDR_NO_RANDOMIZE)");
         }
 
         // Replace the child process with the target program.
@@ -300,7 +300,7 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
         // Parent process.
         // Wait for child to stop (due to SIGSTOP from the child).
         if (waitpid(child, &status, 0) == -1) {
-            panic("waitpid");
+            PANIC_PERROR("waitpid");
         }
 
         if (!WIFSTOPPED(status)) {
@@ -310,17 +310,17 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
         
         // Set options to catch exec event.
         if (ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACEEXEC) == -1) {
-            panic("ptrace(PTRACE_SETOPTIONS)");
+            PANIC_PERROR("ptrace(PTRACE_SETOPTIONS)");
         }
 
         // Resume the child process. It will now execute until the exec call.
         if (ptrace(PTRACE_CONT, child, 0, 0) == -1) {
-            panic("ptrace(PTRACE_CONT)");
+            PANIC_PERROR("ptrace(PTRACE_CONT)");
         }
 
         // Wait for the child to hit the exec event.
         if (waitpid(child, &status, 0) == -1) {
-            panic("waitpid");
+            PANIC_PERROR("waitpid");
         }
 
         // Check if this stop is due to the exec event.
@@ -336,7 +336,7 @@ void load_linux(char** argv, struct linux_proc* linux_proc) {
             
             struct user_regs_struct user_regs;
             if (ptrace(PTRACE_GETREGS, child, NULL, &user_regs) == -1) {
-                panic("ptrace(PTRACE_GETREGS)");
+                PANIC_PERROR("ptrace(PTRACE_GETREGS)");
             }
 
             linux_proc->pid = child;

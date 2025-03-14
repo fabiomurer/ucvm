@@ -232,7 +232,7 @@ struct memory_chunk get_free_memory_chunk(size_t pages_count) {
     static size_t first_free_page = 0;
 
     if (first_free_page + pages_count >= PAGE_NUMBER) {
-        panic("NOT ENOUGHT MEMORY");
+        PANIC("NOT ENOUGHT MEMORY");
     }
 
     uint64_t index = PAGE_SIZE * first_free_page;
@@ -292,7 +292,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 
 	// if not alligned
 	if ((vaddr % PAGE_SIZE != 0) || (phys_addr % PAGE_SIZE != 0)) {
-        panic("ALIGMENT PROBLEMS");
+        PANIC("ALIGMENT PROBLEMS");
     }
 	
 	// map page walk
@@ -303,7 +303,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 		if (i == PAGE_TABLE_LEVELS - 1) {
 			// is alredy mapped (not 0)
 			if (*g_a) {
-				panic("PAGE ALREADY MAPPED");
+				PANIC("PAGE ALREADY MAPPED");
 			}
 			// Last page. Just set it to the physicall address
 			*g_a = (uint64_t)phys_addr | (PAGE_PRESENT | PAGE_RW);

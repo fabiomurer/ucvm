@@ -32,7 +32,7 @@ bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
 
 	uint8_t inst[2];
 	if (read_buffer_host(vm, regs->rip, inst, sizeof(u_int8_t)*2) < 0) {
-		panic("read_buffer_host");
+		PANIC("read_buffer_host");
 	} 
 
 	uint64_t rip_content = inst[1] | (inst[0] << 8);
@@ -74,18 +74,18 @@ uint64_t vlinux_syscall_arch_prctl(struct vm* vm, uint64_t op, uint64_t addr) {
 	switch(op) {
 		case ARCH_SET_FS:
 			if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
-				panic("KVM_GET_SREGS2");
+				PANIC_PERROR("KVM_GET_SREGS2");
 			}
 
 			// set the base address of fs register to addr
 			sregs.fs.base = addr;
 			
 			if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
-				panic("KVM_SET_SREGS2");
+				PANIC_PERROR("KVM_SET_SREGS2");
 			}
 			return 0;
 		default:
-			panic("vlinux_syscall_arch_prctl OP NOT SUPPORTED");
+			PANIC("vlinux_syscall_arch_prctl OP NOT SUPPORTED");
 			break;
 	}
 	return ret;
@@ -112,7 +112,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 
 			uint8_t* tmp_buff	= malloc(sizeof(uint8_t) * len);
 			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
-				panic("read_buffer_host");
+				PANIC("read_buffer_host");
 			}
 
 			ret = write((int)arg1, tmp_buff, arg3);
@@ -133,7 +133,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				ret = -errno;
 			} else {
 				if (write_buffer_guest(vm, statbuf, (uint8_t*)&tmp_statbuf, sizeof(tmp_statbuf)) < 0) {
-					panic("write_buffer_guest");
+					PANIC("write_buffer_guest");
 				}
 			}
 			break;
@@ -175,7 +175,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 		HANDLE_SYSCALL(__NR_readlinkat)
 			char pathname[PATH_MAX];
 			if (read_string_host(vm, arg2, pathname, PATH_MAX) < 0) {
-				panic("read_string_host");
+				PANIC("read_string_host");
 			}
 			int dirfd = (int)arg1;
 
@@ -183,16 +183,16 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			if (strcmp("/proc/self/exe", pathname) == 0 && dirfd == AT_FDCWD) {
 				char buf[PATH_MAX] = "\0";
 				if (realpath(linux_proc->argv[0], buf) == NULL) {
-					panic("realpath");
+					PANIC_PERROR("realpath");
 				}
 				ret = strlen(buf);
 
 				if (write_string_guest(vm, arg3, buf, PATH_MAX) < 0) {
-					panic("write_string_guest");
+					PANIC("write_string_guest");
 				}
 				printf("%s\n", buf);
 			} else {
-				panic("__NR_readlinkat case not supported");
+				PANIC("__NR_readlinkat case not supported");
 				ret = -1;
 			}
 			break;
@@ -217,7 +217,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 				// for vm no limit for stack-> do nothing
 				ret = 0;
 			} else {
-				panic("__NR_prlimit64 case not supported");
+				PANIC("__NR_prlimit64 case not supported");
 			}
 			break;
 
@@ -227,11 +227,11 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			unsigned int flags = arg3;
 
 			uint8_t* tbuf = malloc(buflen * sizeof(char));
-			if (tbuf == NULL) panic("malloc");
+			if (tbuf == NULL) PANIC_PERROR("malloc");
 
 			ret = getrandom(tbuf, buflen, flags);
 			if (write_buffer_guest(vm, buf, tbuf, buflen) < 0) {
-				panic("write_buffer_guest");
+				PANIC("write_buffer_guest");
 			}
 
 			free(tbuf);
