@@ -140,6 +140,10 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			ret = vlinux_syscall_brk(linux_proc, arg1);
 			break;
 
+		HANDLE_SYSCALL(__NR_getpid)
+			ret = getpid();
+			break;
+
 		HANDLE_SYSCALL(__NR_exit)
 			_exit(arg1);
 			break;

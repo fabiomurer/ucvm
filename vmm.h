@@ -5,7 +5,7 @@
 #include <linux/kvm.h>
 
 #define PAGE_SIZE 4096
-#define PAGE_NUMBER 4096
+#define PAGE_NUMBER 10000
 #define MEMORY_SIZE (PAGE_SIZE * PAGE_NUMBER)
 #define MEMORY_SLOT 2
 #define GUEST_PHYS_ADDR 0xA000
