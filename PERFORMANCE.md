@@ -1,0 +1,5 @@
+## cpu cache:
+- done but bho
+
+## hugepages:
+- bisogna essere amministratori per montare il filesystem hugetln [link](https://www.kernel.org/doc/html/latest/admin-guide/mm/hugetlbpage.html#using-huge-pages)

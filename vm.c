@@ -177,6 +177,34 @@ void cpu_init_xcrs(struct kvm_xcrs* xrcs) {
     }
 }
 
+void cpu_init_cache(struct vm* vm, struct kvm_sregs2* sregs) {
+    // cache disabled
+    #define CR0_CD (1ULL << 30)
+    // not write_thorught
+    #define CR0_NW (1ULL << 29)
+
+    // Clear CD (bit 30) and NW (bit 29) to enable caching
+    sregs->cr0 &= ~(CR0_CD | CR0_NW);
+
+    #define MSR_MTRR_DEFTYPE 0x2FF
+    // mtrr enabled
+    #define MTRR_E (1ULL << 11)
+    // writeback
+    #define MTRR_TYPE_WB 6
+
+    int num_msrs = 1;
+    struct kvm_msrs* msrs = malloc(sizeof(struct kvm_msrs) + num_msrs * sizeof(struct kvm_msr_entry));
+    if (msrs == NULL) {PANIC_PERROR("malloc");}
+
+    msrs->nmsrs = num_msrs;
+    msrs->entries[0].index = MSR_MTRR_DEFTYPE;
+    msrs->entries[0].data  = MTRR_E | MTRR_TYPE_WB;
+
+    if (ioctl(vm->vcpufd, KVM_SET_MSRS, msrs) < 0) {
+        PANIC_PERROR("KVM_SET_MSRS");
+    }
+}
+
 void vm_init(struct vm* vm) {
     cpu_init_cpuid(vm);
 
@@ -205,6 +233,8 @@ void vm_init(struct vm* vm) {
     cpu_init_fpu(&fpu);
 
     cpu_init_xcrs(&xcrs);
+    
+    cpu_init_cache(vm, &sregs);
     
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
         PANIC_PERROR("KVM_SET_REGS");
