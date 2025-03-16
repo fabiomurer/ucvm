@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <error.h>
 #include <errno.h>
+#include <sched.h>
 
 #define KVM_DEVICE "/dev/kvm"
 
@@ -61,6 +62,15 @@ struct vm vm_create(void) {
             MAP_SHARED, 
             vm.vcpufd, 0)) == MAP_FAILED) {
         PANIC_PERROR("MMAP");
+    }
+
+    // pin the vcpu at one cop
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    // pin to cpu 0
+    CPU_SET(0, &set);
+    if (sched_setaffinity(getpid(), sizeof(set), &set) == -1) {
+        PANIC_PERROR("sched_setaffinity");
     }
 
     // create memory
@@ -356,8 +366,7 @@ void vm_exit_handler(int exit_code, struct vm* vm, struct linux_proc* linux_proc
             // skip syscall instruction
 			regs.rip += SYSCALL_OP_SIZE;
 			if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
-				perror("KVM_GET_REGS");
-				exit(-1);
+				PANIC_PERROR("KVM_SET_REGS");
 			}
 		} else {
 			printf("unespected shutdown\n");

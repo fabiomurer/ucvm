@@ -31,7 +31,7 @@
 bool is_syscall(struct vm* vm, struct kvm_regs* regs) {
 
 	uint8_t inst[2];
-	if (read_buffer_host(vm, regs->rip, inst, sizeof(u_int8_t)*2) < 0) {
+	if (read_buffer_host(vm, regs->rip, inst, sizeof(inst)) < 0) {
 		PANIC("read_buffer_host");
 	} 
 
@@ -242,9 +242,6 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 			break;
 
 		default:
-			#ifdef DEBUG
-			printf("ENOSYS, syscall number %d\n", (int)sysno);
-			#endif
 			ret = -ENOSYS;
 			sysno = ENOSYS; // return syscall not recognised
 	}

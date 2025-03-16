@@ -11,3 +11,4 @@
 ## avx make vmexit (bho)
 
 ## pin vcpu to cpu
+increase of perfromances
