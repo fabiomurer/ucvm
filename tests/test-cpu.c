@@ -19,33 +19,15 @@ static inline long my_syscall(long syscall_number, long arg1, long arg2, long ar
     }
 }
 
-#define SIZE 1000UL
-
-void multiply_matrices(double a[SIZE][SIZE], double b[SIZE][SIZE], double c[SIZE][SIZE]) {
-    for (uint64_t i = 0; i < SIZE; i++) {
-        for (uint64_t j = 0; j < SIZE; j++) {
-            c[i][j] = 0;
-            for (uint64_t k = 0; k < SIZE; k++) {
-                c[i][j] += a[i][k] * b[k][j];
-            }
-        }
-    }
-}
-
-static double a[SIZE][SIZE], b[SIZE][SIZE], c[SIZE][SIZE];
 
 void __attribute__((noreturn)) __attribute__((section(".start"))) _start(void) {
-
-    // Initialize matrices with a simple pattern
-    for (uint64_t i = 0; i < SIZE; i++) {
-        for (uint64_t j = 0; j < SIZE; j++) {
-            a[i][j] = i + j;
-            b[i][j] = i - j;
+    size_t x = 0;
+    for (size_t i = 0; i < 100000; i++) {
+        for (size_t j = 0; j < 10000; j++) {
+            x = i - j;
         }
     }
 
-    multiply_matrices(a, b, c);
-
-    my_syscall(60, 0, 0, 0, 0, 0, 0); // exit succes
+    my_syscall(60, x, 0, 0, 0, 0, 0); // exit succes
     for (;;) __asm__("hlt");
 }
