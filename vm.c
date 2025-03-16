@@ -199,20 +199,24 @@ void cpu_init_cache(struct vm* vm, struct kvm_sregs2* sregs) {
     #define MSR_MTRR_DEFTYPE 0x2FF
     // mtrr enabled
     #define MTRR_E (1ULL << 11)
+    // mtrr fixed range enable
+    #define MTRR_FE (1ULL << 10)
     // writeback
     #define MTRR_TYPE_WB 6
 
+    
     int num_msrs = 1;
     struct kvm_msrs* msrs = malloc(sizeof(struct kvm_msrs) + num_msrs * sizeof(struct kvm_msr_entry));
     if (msrs == NULL) {PANIC_PERROR("malloc");}
 
     msrs->nmsrs = num_msrs;
     msrs->entries[0].index = MSR_MTRR_DEFTYPE;
-    msrs->entries[0].data  = MTRR_E | MTRR_TYPE_WB;
+    msrs->entries[0].data  = MTRR_E | MTRR_FE | MTRR_TYPE_WB;
 
     if (ioctl(vm->vcpufd, KVM_SET_MSRS, msrs) < 0) {
         PANIC_PERROR("KVM_SET_MSRS");
     }
+    
 }
 
 void vm_init(struct vm* vm) {
