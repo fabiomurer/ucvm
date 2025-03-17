@@ -187,7 +187,7 @@ void cpu_init_xcrs(struct kvm_xcrs* xrcs) {
     }
 }
 
-void cpu_init_cache(struct vm* vm, struct kvm_sregs2* sregs) {
+void cpu_init_cache(struct kvm_sregs2* sregs) {
     // cache disabled
     #define CR0_CD (1ULL << 30)
     // not write_thorught
@@ -196,27 +196,20 @@ void cpu_init_cache(struct vm* vm, struct kvm_sregs2* sregs) {
     // Clear CD (bit 30) and NW (bit 29) to enable caching
     sregs->cr0 &= ~(CR0_CD | CR0_NW);
 
-    #define MSR_MTRR_DEFTYPE 0x2FF
-    // mtrr enabled
-    #define MTRR_E (1ULL << 11)
-    // mtrr fixed range enable
-    #define MTRR_FE (1ULL << 10)
-    // writeback
-    #define MTRR_TYPE_WB 6
-
-    
-    int num_msrs = 1;
-    struct kvm_msrs* msrs = malloc(sizeof(struct kvm_msrs) + num_msrs * sizeof(struct kvm_msr_entry));
-    if (msrs == NULL) {PANIC_PERROR("malloc");}
-
-    msrs->nmsrs = num_msrs;
-    msrs->entries[0].index = MSR_MTRR_DEFTYPE;
-    msrs->entries[0].data  = MTRR_E | MTRR_FE | MTRR_TYPE_WB;
-
-    if (ioctl(vm->vcpufd, KVM_SET_MSRS, msrs) < 0) {
-        PANIC_PERROR("KVM_SET_MSRS");
-    }
-    
+    /*
+    PAT is set to wb for all memory pages in vmm.c
+    WB better for ram
+    IA32_PAT (MSR 0x277) default value 0x0007040600070406
+    Index	PAT	PCD	PWT	Value	Memory Type
+    0	    0	0	0	0x06	Write-Back (WB)
+    1	    0	0	1	0x04	Write-Through (WT)
+    2	    0	1	0	0x07	Uncacheable-Minus (UC-)
+    3	    0	1	1	0x00	Uncacheable (UC)
+    4	    1	0	0	0x06	Write-Back (WB)
+    5	    1	0	1	0x04	Write-Through (WT)
+    6	    1	1	0	0x07	Uncacheable-Minus (UC-)
+    7	    1	1	1	0x00	Uncacheable (UC)
+    */
 }
 
 void vm_init(struct vm* vm) {
@@ -248,7 +241,7 @@ void vm_init(struct vm* vm) {
 
     cpu_init_xcrs(&xcrs);
     
-    cpu_init_cache(vm, &sregs);
+    cpu_init_cache(&sregs);
     
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
         PANIC_PERROR("KVM_SET_REGS");

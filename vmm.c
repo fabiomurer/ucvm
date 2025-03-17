@@ -265,6 +265,17 @@ struct memory_chunk get_free_memory_chunk(size_t pages_count) {
 #define PAGE_PRESENT	(1ULL << 0)
 #define PAGE_RW		    (1ULL << 1)
 
+//cache
+#define PAGE_PWT		(1ULL << 3)    /* Page Write Through */
+#define PAGE_PCD		(1ULL << 4)    /* Page Cache Disable */
+#define PAGE_PAT		(1ULL << 7)    /* Page Attribute Table */
+
+#define PAGE_CACHE_WB      	0              			/* Write-back PAT, PCD, PWT = 0 */
+#define PAGE_CACHE_WT      	PAGE_PWT       			/* Write-through PWT=1*/
+#define PAGE_CACHE_UC_MINUS PAGE_PCD       			/* Uncacheable minus PCD=1*/
+#define PAGE_CACHE_UC      	(PAGE_PCD | PAGE_PWT)  	/* Uncacheable PWT,PCD=1*/
+
+#define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB)
 // ?
 struct memory_chunk from_guest(uint64_t gaddr) {
     // rounds gaddr down to the nearest multiple of PAGE_SIZE
@@ -309,7 +320,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 				PANIC("PAGE ALREADY MAPPED");
 			}
 			// Last page. Just set it to the physicall address
-			*g_a = (uint64_t)phys_addr | (PAGE_PRESENT | PAGE_RW);
+			*g_a = (uint64_t)phys_addr | PAGE_FLAGS;
 			break;
 		}
 		// if the part of the current level is not mapped, map it
@@ -317,7 +328,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 			#ifdef DEBUG
 			printf("Allocating level %zu\n", i);
 			#endif
-			*g_a = get_free_memory_chunk(1).guest | (PAGE_PRESENT | PAGE_RW);
+			*g_a = get_free_memory_chunk(1).guest | PAGE_FLAGS;
 		}
 		cur_addr = from_guest(*g_a);
 	}
