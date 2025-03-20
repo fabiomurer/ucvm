@@ -9,6 +9,7 @@
 #include "load_kvm.h"
 #include "vsyscall.h"
 #include "vminfo.h"
+#include "arguments.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -65,13 +66,16 @@ struct vm vm_create(void) {
     }
 
     // pin the vcpu at one cop
-    cpu_set_t set;
-    CPU_ZERO(&set);
-    // pin to cpu 0
-    CPU_SET(0, &set);
-    if (sched_setaffinity(getpid(), sizeof(set), &set) == -1) {
-        PANIC_PERROR("sched_setaffinity");
-    }
+    if (arguments.cpu_pin != -1) {
+        cpu_set_t set;
+        CPU_ZERO(&set);
+        // pin to cpu 0
+        CPU_SET(0, &set);
+        
+        if (sched_setaffinity(getpid(), sizeof(set), &set) == -1) {
+            PANIC_PERROR("sched_setaffinity");
+        }
+    } 
 
     // create memory
     if ((vm.memory = mmap(
@@ -307,8 +311,7 @@ void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
 
     // kill traced process
     if (kill(linux_proc->pid, SIGKILL) == -1) {
-        perror("kill");
-        exit(EXIT_FAILURE);
+        PANIC_PERROR("kill");
     }
     
     int status;

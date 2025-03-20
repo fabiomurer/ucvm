@@ -19,9 +19,9 @@ static char args_doc[] = "[ARGS...]";
 static struct argp_option options[] = {
     {"debug", 'd', "HOST:PORT", 0, "Enable debug mode with specified server", 0},
     {"trace", 't', 0, 0, "Enable trace mode", 0},
+    {"pin", 'p', "CORE", 0, "Pin to specified CPU core", 0},
     {0}
 };
-
 
 // parse a single option
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -33,6 +33,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
         break;
     case 't': /* --trace */
         arguments->trace_enabled = true;
+        break;
+    case 'p': /* --pin */
+        arguments->cpu_pin = atoi(arg);
         break;
     case ARGP_KEY_END:
         break;
@@ -58,7 +61,7 @@ int find_dash_dash_position(int argc, char *argv[]) {
     return -1;  /* Not found */
 }
 
-// grlobal variable
+// global variable
 struct arguments arguments;
 
 int main(int argc, char *argv[]) {
@@ -68,6 +71,7 @@ int main(int argc, char *argv[]) {
     arguments.debug_server = NULL;
     arguments.program_args = NULL;
     arguments.program_args_count = 0;
+    arguments.cpu_pin = -1;  /* -1 indicates no pinning */
     
     /* Find the position of -- if it exists */
     int separator_pos = find_dash_dash_position(argc, argv);
@@ -87,7 +91,6 @@ int main(int argc, char *argv[]) {
         arguments.program_args_count = argc - separator_pos - 1;
     }
 	
-
     struct linux_proc linux_proc;
 	linux_proc.argv = arguments.program_args;
 	
