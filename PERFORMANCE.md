@@ -16,22 +16,7 @@ increase of perfromances
 
 ## test
 
-```bash
-hyperfine -i --export-markdown /tmp/test-cpu.md './tests/test-cpu' \
-'./release_build/ucvm -- ./tests/test-cpu' \
-'./release_build/ucvm -p0 -- ./tests/test-cpu' \
-'umvu ./tests/test-cpu' \
-'umvu -S ./tests/test-cpu'
-```
-
-
-```bash
-hyperfine -i --export-markdown /tmp/test-syscall.md './tests/test-syscall' \
-'./release_build/ucvm -- ./tests/test-syscall' \
-'./release_build/ucvm -p0 -- ./tests/test-syscall' \
-'umvu ./tests/test-syscall' \
-'umvu -S ./tests/test-syscall'
-```
+run with `bash tests/benchmark.sh program`
 
 ### 2025.03.20
 ### cpu
@@ -70,4 +55,24 @@ Summary
    39.50 ± 9.59 times faster than ./release_build/ucvm -- ./tests/test-syscall
    47.44 ± 12.46 times faster than umvu ./tests/test-syscall
    95.88 ± 25.37 times faster than umvu -S ./tests/test-syscall
+```
+
+### io
+
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `./tests/test-io` | 157.5 ± 13.1 | 148.7 | 184.6 | 1.00 |
+| `./release_build/ucvm -- ./tests/test-io` | 335.7 ± 14.7 | 308.1 | 353.1 | 2.13 ± 0.20 |
+| `./release_build/ucvm -p0 -- ./tests/test-io` | 302.9 ± 14.3 | 287.0 | 326.2 | 1.92 ± 0.18 |
+| `umvu ./tests/test-io` | 335.7 ± 78.1 | 240.5 | 471.9 | 2.13 ± 0.53 |
+| `umvu -S ./tests/test-io` | 441.2 ± 91.9 | 306.4 | 601.5 | 2.80 ± 0.63 |
+
+
+```
+Summary
+  ./tests/test-io ran
+    1.92 ± 0.18 times faster than ./release_build/ucvm -p0 -- ./tests/test-io
+    2.13 ± 0.20 times faster than ./release_build/ucvm -- ./tests/test-io
+    2.13 ± 0.53 times faster than umvu ./tests/test-io
+    2.80 ± 0.63 times faster than umvu -S ./tests/test-io
 ```
