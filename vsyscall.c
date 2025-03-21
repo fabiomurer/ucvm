@@ -21,6 +21,7 @@
 #include <sys/random.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include "vsyscall.h"
 #include "utils.h"
@@ -105,22 +106,53 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 	uint64_t ret = 0;
 
 	switch (sysno) {
-		HANDLE_SYSCALL(__NR_write)
-			int fd 			= (int)arg1;
-			uint64_t buff 	= arg2;
+		HANDLE_SYSCALL(__NR_read) {
+			int fd			= (int)arg1;
+			uint64_t buff	= arg2;
 			size_t len		= arg3;
+			uint8_t* tmp_buff	= malloc(sizeof(uint8_t) * len);
+			
+			ret = read(fd, tmp_buff, len);
 
+			if (write_buffer_guest(vm, buff, tmp_buff, len) < 0) {
+				PANIC("write_buffer_guest");
+			}
+			free(tmp_buff);
+			} break;
+		
+		HANDLE_SYSCALL(__NR_write) {
+			int fd			= (int)arg1;
+			uint64_t buff	= arg2;
+			size_t len		= arg3;
 			uint8_t* tmp_buff	= malloc(sizeof(uint8_t) * len);
 			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
 				PANIC("read_buffer_host");
 			}
 
-			ret = write((int)arg1, tmp_buff, arg3);
+			ret = write(fd, tmp_buff, len);
 			free(tmp_buff);
-			break;
+			} break;
 
-		HANDLE_SYSCALL(__NR_fstat)
-			fd = (int)arg1;
+		HANDLE_SYSCALL(__NR_open) {
+			uint64_t filename	= arg1;
+			int flags 			= (int)arg2;
+			mode_t mode 		= (mode_t)arg3;
+
+			char tmp_filename[PATH_MAX];
+			if (read_string_host(vm, filename, tmp_filename, PATH_MAX) < 0) {
+				PANIC("read_string_host");
+			}
+			ret = open(tmp_filename, flags, mode);
+		} break;
+
+		HANDLE_SYSCALL(__NR_close) {
+			int fd = (int)arg1;
+			ret = close(fd);
+			break;
+		}
+
+		HANDLE_SYSCALL(__NR_fstat) {
+			int fd = (int)arg1;
 			uint64_t statbuf = arg2;
 			struct stat tmp_statbuf;
 
@@ -131,7 +163,7 @@ uint64_t syscall_handler(struct vm* vm, struct linux_proc* linux_proc, struct kv
 					PANIC("write_buffer_guest");
 				}
 			}
-			break;
+			} break;
 
 		HANDLE_SYSCALL(__NR_mprotect)
 			break;

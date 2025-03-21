@@ -1,5 +1,5 @@
 # Default target
-all: hello-glibc hello hello-glibc-dyn test-syscall test-cpu
+all: hello-glibc hello hello-glibc-dyn test-syscall test-cpu test-io
 
 hello-glibc: hello-glibc.c
 	gcc -g -static -o hello-glibc hello-glibc.c
@@ -15,6 +15,9 @@ test-syscall: test-syscall.c
 
 test-cpu: test-cpu.c
 	gcc -static -nostdlib -o test-cpu test-cpu.c 
+
+test-io: test-io.c
+	gcc -static -nostdlib -o test-io test-io.c
 
 clean:
 	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu

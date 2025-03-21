@@ -3,3 +3,4 @@ hello-glibc
 hello-glibc-dyn
 test-syscall
 test-cpu
+test-io
