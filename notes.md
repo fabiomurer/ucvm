@@ -30,3 +30,22 @@ write(1, "ciao\n", 5ciao
 exit_group(0)                           = ?
 +++ exited with 0 +++
 ```
+
+# glibc problems
+
+when running in ucvm:
+
+```
+__run_exit_handlers
+	call_fini
+		_fini
+	40450f:       ff d0                   call   *%rax jump to 0x600 -> crash
+```
+
+should be:
+```
+__run_exit_handlers
+	call_fini
+		_fini
+    call Clean I/0 o roba del genere
+```
