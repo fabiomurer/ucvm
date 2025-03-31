@@ -1,9 +1,8 @@
 #define _GNU_SOURCE
-
+#include <sys/types.h>
 #include "utils.h"
 #include "load_kvm.h"
 #include "vmm.h"
-#include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
 #include <stdio.h>
@@ -49,9 +48,9 @@ void load_kvm(pid_t pid) {
     while (fgets(line, sizeof(line), maps_file) != NULL) {
         u_int64_t start = 0, end = 0;
         char perms[5]           = {0};
-        char offset[20]         = {0};
-        char dev[6]             = {0};
-        char inode[20]          = {0};
+        u_int64_t offset        = 0;
+        char dev[32]            = {0};
+        u_int64_t inode         = 0;
         char pathname[PATH_MAX] = {0};
 
         // Parse the line.
@@ -59,8 +58,8 @@ void load_kvm(pid_t pid) {
         // address           perms offset  dev   inode       pathname
         // e.g., 00400000-00452000 r-xp 00000000 08:02 173521      /usr/bin/dbus-daemon
         // pathname is optional, so we include it as an optional field
-        sscanf(line, "%lx-%lx %s %s %s %s %4095[^\n]",
-                            &start, &end, perms, offset, dev, inode, pathname);
+        sscanf(line, "%lx-%lx %4s %lx %31s %lx %4095[^\n]",
+            &start, &end, perms, &offset, dev, &inode, pathname);
 
         // Calculate the size of the segment.
         size_t segment_size = end - start;
