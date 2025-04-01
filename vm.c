@@ -291,6 +291,26 @@ void vm_set_debug_step(struct vm* vm, bool enable_step) {
 	}
 }
 
+void clear_regs(struct kvm_regs* regs) {
+    regs->rax = 0;                  
+    regs->rbx = 0;                  
+    regs->rcx = 0;                  
+    regs->rdx = 0;                  
+    regs->rsi = 0;                  
+    regs->rdi = 0;                  
+    regs->rbp = 0;                  
+    regs->rsp = 0;                  
+    regs->r8  = 0;                  
+    regs->r9  = 0;                  
+    regs->r10 = 0;                  
+    regs->r11 = 0;                  
+    regs->r12 = 0;                  
+    regs->r13 = 0;                  
+    regs->r14 = 0;                  
+    regs->r15 = 0;                  
+    regs->rip = 0;
+}
+
 void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
     load_linux(linux_proc->argv, linux_proc);
 
@@ -300,8 +320,11 @@ void vm_load_program(struct vm* vm, struct linux_proc* linux_proc) {
         PANIC_PERROR("KVM_GET_REGS");
     }
 
+    clear_regs(&regs); // clear some leftover junk buy ??
+
     regs.rip = linux_proc->rip;
     regs.rsp = linux_proc->rsp;
+    regs.rflags = 0x202; // linux sets up like this
 
     if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
         PANIC_PERROR("KVM_SET_REGS");
