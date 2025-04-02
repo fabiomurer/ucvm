@@ -386,7 +386,6 @@ void vm_exit_handler(int exit_code, struct vm *vm, struct linux_proc *linux_proc
 			if (syscall_handler(vm, linux_proc, &regs) == ENOSYS) {
 				vcpu_events_logs(vm);
 				vcpu_regs_log(vm);
-				printf("syscall num: %lld not supported\n", regs.rax);
 				exit(-1);
 			}
 

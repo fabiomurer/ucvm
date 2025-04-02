@@ -289,6 +289,7 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		break;
 
 	default:
+		printf("syscall num: %lld not supported\n", regs->rax);
 		ret = -ENOSYS;
 		sysno = ENOSYS; // return syscall not recognised
 	}
