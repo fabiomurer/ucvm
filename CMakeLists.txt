@@ -55,7 +55,6 @@ find_program(CLANG_TIDY "clang-tidy")
 # Get all source files
 file(GLOB_RECURSE ALL_SOURCE_FILES 
     ${CMAKE_SOURCE_DIR}/src/*.c
-    ${CMAKE_SOURCE_DIR}/src/*.h
     ${CMAKE_SOURCE_DIR}/include/*.h
 )
 
@@ -66,10 +65,20 @@ add_custom_target(format
     VERBATIM
 )
 
+
+# Create a custom target to create symbolic link to compilation database
+add_custom_target(create_compile_commands_symlink
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_BINARY_DIR}/compile_commands.json
+            ${CMAKE_SOURCE_DIR}/compile_commands.json
+    COMMENT "Creating symlink to compilation database at ${CMAKE_SOURCE_DIR}/compile_commands.json"
+)
+
 # Add target to run clang-tidy on all source files
 add_custom_target(lint
-    COMMAND bash -c "${CLANG_TIDY} ${ALL_SOURCE_FILES} -p=${CMAKE_BINARY_DIR}"
-    COMMENT "Running clang-tidy on all source files"
+    DEPENDS create_compile_commands_symlink
+    COMMAND ${CLANG_TIDY} ${ALL_SOURCE_FILES}
+    COMMENT "Running clang-tidy on all source file"
     VERBATIM
 )
 

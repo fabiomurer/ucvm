@@ -1,6 +1,3 @@
 .vscode
-debug_build
-release_build
-ucvm
 compile_commands.json
 .cache
