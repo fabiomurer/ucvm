@@ -23,6 +23,6 @@ test-io: test-io.c
 	gcc -static -nostdlib -o test-io test-io.c
 
 clean:
-	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu nothing-glibc
+	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu nothing-glibc test-io 
 
 .PHONY: all clean
