@@ -46,5 +46,32 @@ target_link_libraries(${PROJECT_NAME}
     ${CMAKE_CURRENT_SOURCE_DIR}/mini-gdbstub/build/libgdbstub.a
 )
 
+## linting
+
+# Find required programs
+find_program(CLANG_FORMAT "clang-format")
+find_program(CLANG_TIDY "clang-tidy")
+
+# Get all source files
+file(GLOB_RECURSE ALL_SOURCE_FILES 
+    ${CMAKE_SOURCE_DIR}/src/*.c
+    ${CMAKE_SOURCE_DIR}/src/*.h
+    ${CMAKE_SOURCE_DIR}/include/*.h
+)
+
+# Add target to run clang-format on all source files
+add_custom_target(format
+    COMMAND ${CLANG_FORMAT} -i ${ALL_SOURCE_FILES}
+    COMMENT "Running clang-format on all source files"
+    VERBATIM
+)
+
+# Add target to run clang-tidy on all source files
+add_custom_target(lint
+    COMMAND bash -c "${CLANG_TIDY} ${ALL_SOURCE_FILES} -p=${CMAKE_BINARY_DIR}"
+    COMMENT "Running clang-tidy on all source files"
+    VERBATIM
+)
+
 # Print build type
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")

@@ -1,0 +1,55 @@
+---
+Checks: 'bugprone-*,
+         cert-*,
+         clang-analyzer-*,
+         concurrency-*,
+         cppcoreguidelines-*,
+         misc-*,
+         modernize-*,
+         performance-*,
+         portability-*,
+         readability-*,
+         security-*,
+         -modernize-use-trailing-return-type'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+AnalyzeTemporaryDtors: false
+FormatStyle: file
+User: fabiomurer
+CheckOptions:
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.ConstantCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key: cert-dcl16-c.NewSuffixes
+    value: 'L;LL;LU;LLU'
+  - key: cert-err33-c.CheckedFunctions
+    value: '::malloc;::calloc;::realloc;::free;::alloca'
+  - key: cert-str34-c.DiagnoseSignedUnsignedCharComparisons
+    value: 'true'
+  - key: cppcoreguidelines-explicit-virtual-functions.IgnoreDestructors
+    value: 'true'
+  - key: cppcoreguidelines-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: 'true'
+  - key: misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic
+    value: 'true'
+  - key: readability-function-size.LineThreshold
+    value: '50'
+  - key: readability-function-size.ParameterThreshold
+    value: '5'
+  - key: readability-function-size.StatementThreshold
+    value: '20'
+  - key: readability-identifier-length.MinimumVariableNameLength
+    value: '3'
+  - key: readability-identifier-length.MinimumParameterNameLength
+    value: '3'
+  - key: readability-identifier-length.MinimumLoopCounterNameLength
+    value: '1'  # Allow i, j, k for loop counters
