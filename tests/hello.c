@@ -8,7 +8,7 @@ static inline long my_syscall(long syscall_number, long arg1, long arg2,
   register long a3 asm("rdx") = arg3;
   register long a4 asm("r10") = arg4;
   register long a5 asm("r8") = arg5;
-  register long a6 asm("r8") = arg6;
+  register long a6 asm("r9") = arg6;
   asm("syscall");
 
   if (syscall_no < 0) {

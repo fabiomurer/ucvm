@@ -8,7 +8,7 @@ static inline long my_syscall(long syscall_number, long arg1, long arg2, long ar
     register long a3 __asm__("rdx") = arg3;
     register long a4 __asm__("r10") = arg4;
     register long a5 __asm__("r8") = arg5;
-    register long a6 __asm__("r8") = arg6;
+    register long a6 __asm__("r9") = arg6;
     __asm__("syscall");
 
     if (syscall_no < 0) {

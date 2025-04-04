@@ -105,8 +105,9 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 	uint64_t arg1 = regs->rdi;
 	uint64_t arg2 = regs->rsi;
 	uint64_t arg3 = regs->rdx;
-	// uint64_t arg4 = regs->r10;
-	// uint64_t arg5 = regs->r9;
+	uint64_t arg4 = regs->r10;
+	//uint64_t arg5 = regs->r8;
+	//uint64_t arg6 = regs->r9;
 	uint64_t ret = 0;
 
 	switch (sysno) {
@@ -179,11 +180,38 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		}
 		break;
 
+		/*
+		waiting for a better allocation process
+		HANDLE_SYSCALL(__NR_mmap) {
+			void* addr = (void*)arg1;
+			size_t lenght = (size_t)arg2;
+			int prot = (int)arg3;
+			int flags = (int)arg4;
+			int fd = (int)arg5;
+			off_t offset = (off_t)arg6;
+
+			if (fd !=)
+
+		}
+		*/
+
 		HANDLE_SYSCALL(__NR_mprotect)
 		break;
 
 		HANDLE_SYSCALL(__NR_brk)
 		ret = vlinux_syscall_brk(linux_proc, arg1);
+		break;
+
+		HANDLE_SYSCALL(__NR_access)
+		{
+			uint64_t pathname = arg1;
+			int mode = (int)arg2;
+
+			char tmp_pathname[PATH_MAX] = { 0 };
+			read_string_host(vm, pathname, tmp_pathname, PATH_MAX);
+
+			ret = syscall(__NR_access, tmp_pathname, mode);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_getpid)
@@ -215,6 +243,20 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		HANDLE_SYSCALL(__NR_exit_group)
 		int status = (int)arg1;
 		syscall(SYS_exit_group, status);
+		break;
+
+		HANDLE_SYSCALL(__NR_openat)
+		{
+			int dirfd = (int)arg1;
+			uint64_t filename = arg2;
+			int flags = (int)arg3;
+			mode_t mode = (mode_t)arg4;
+
+			char tmp_filename[PATH_MAX] = { 0 };
+			read_string_host(vm, filename, tmp_filename, PATH_MAX);
+
+			ret = syscall(__NR_openat, dirfd, tmp_filename, flags, mode);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_readlinkat)
