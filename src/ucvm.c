@@ -7,7 +7,7 @@
 
 #include "arguments.h"
 #include "load_linux.h"
-#include "mygdbstub.h"
+#include "debugger.h"
 #include "vm.h"
 
 // Program documentation

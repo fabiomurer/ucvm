@@ -106,8 +106,8 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 	uint64_t arg2 = regs->rsi;
 	uint64_t arg3 = regs->rdx;
 	uint64_t arg4 = regs->r10;
-	//uint64_t arg5 = regs->r8;
-	//uint64_t arg6 = regs->r9;
+	// uint64_t arg5 = regs->r8;
+	// uint64_t arg6 = regs->r9;
 	uint64_t ret = 0;
 
 	switch (sysno) {

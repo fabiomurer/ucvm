@@ -10,101 +10,11 @@
 #include <sys/types.h>
 
 #include "guest_inspector.h"
-#include "mygdbstub.h"
+#include "debugger.h"
 #include "utils.h"
 #include "vm.h"
 
 uint8_t break_instr = 0xcc;
-
-#define TARGET_X86_64 "<target version=\"1.0\"><architecture>i386:x86-64</architecture></target>"
-
-enum GDB_REGISTER {
-	/* 64-bit general purpose registers */
-	GDB_CPU_X86_64_REG_RAX = 0,
-	GDB_CPU_X86_64_REG_RBX = 1,
-	GDB_CPU_X86_64_REG_RCX = 2,
-	GDB_CPU_X86_64_REG_RDX = 3,
-	GDB_CPU_X86_64_REG_RSI = 4,
-	GDB_CPU_X86_64_REG_RDI = 5,
-	GDB_CPU_X86_64_REG_RBP = 6,
-	GDB_CPU_X86_64_REG_RSP = 7,
-	GDB_CPU_X86_64_REG_R8 = 8,
-	GDB_CPU_X86_64_REG_R9 = 9,
-	GDB_CPU_X86_64_REG_R10 = 10,
-	GDB_CPU_X86_64_REG_R11 = 11,
-	GDB_CPU_X86_64_REG_R12 = 12,
-	GDB_CPU_X86_64_REG_R13 = 13,
-	GDB_CPU_X86_64_REG_R14 = 14,
-	GDB_CPU_X86_64_REG_R15 = 15,
-	GDB_CPU_X86_64_REG_RIP = 16,
-	GDB_CPU_X86_64_REG_EFLAGS = 17,
-	GDB_CPU_X86_64_REG_CS = 18,
-	GDB_CPU_X86_64_REG_SS = 19,
-	GDB_CPU_X86_64_REG_DS = 20,
-	GDB_CPU_X86_64_REG_ES = 21,
-	GDB_CPU_X86_64_REG_FS = 22,
-	GDB_CPU_X86_64_REG_GS = 23,
-
-	/* FPU registers */
-	GDB_CPU_X86_64_REG_ST0 = 24,
-	GDB_CPU_X86_64_REG_ST1 = 25,
-	GDB_CPU_X86_64_REG_ST2 = 26,
-	GDB_CPU_X86_64_REG_ST3 = 27,
-	GDB_CPU_X86_64_REG_ST4 = 28,
-	GDB_CPU_X86_64_REG_ST5 = 29,
-	GDB_CPU_X86_64_REG_ST6 = 30,
-	GDB_CPU_X86_64_REG_ST7 = 31,
-
-	GDB_CPU_X86_64_REG_FCTRL = 32,
-	GDB_CPU_X86_64_REG_FSTAT = 33,
-	GDB_CPU_X86_64_REG_FTAG = 34,
-	GDB_CPU_X86_64_REG_FISEG = 35,
-	GDB_CPU_X86_64_REG_FIOFF = 36,
-	GDB_CPU_X86_64_REG_FOSEG = 37,
-	GDB_CPU_X86_64_REG_FOOFF = 38,
-	GDB_CPU_X86_64_REG_FOP = 39,
-
-	/* SSE registers */
-	GDB_CPU_X86_64_REG_XMM0 = 40,
-	GDB_CPU_X86_64_REG_XMM1 = 41,
-	GDB_CPU_X86_64_REG_XMM2 = 42,
-	GDB_CPU_X86_64_REG_XMM3 = 43,
-	GDB_CPU_X86_64_REG_XMM4 = 44,
-	GDB_CPU_X86_64_REG_XMM5 = 45,
-	GDB_CPU_X86_64_REG_XMM6 = 46,
-	GDB_CPU_X86_64_REG_XMM7 = 47,
-	GDB_CPU_X86_64_REG_XMM8 = 48,
-	GDB_CPU_X86_64_REG_XMM9 = 49,
-	GDB_CPU_X86_64_REG_XMM10 = 50,
-	GDB_CPU_X86_64_REG_XMM11 = 51,
-	GDB_CPU_X86_64_REG_XMM12 = 52,
-	GDB_CPU_X86_64_REG_XMM13 = 53,
-	GDB_CPU_X86_64_REG_XMM14 = 54,
-	GDB_CPU_X86_64_REG_XMM15 = 55,
-
-	/* SSE control/status registers */
-	GDB_CPU_X86_64_REG_MXCSR = 56,
-
-	/* AVX YMM registers */
-	GDB_CPU_X86_64_REG_YMM0 = 57,
-	GDB_CPU_X86_64_REG_YMM1 = 58,
-	GDB_CPU_X86_64_REG_YMM2 = 59,
-	GDB_CPU_X86_64_REG_YMM3 = 60,
-	GDB_CPU_X86_64_REG_YMM4 = 61,
-	GDB_CPU_X86_64_REG_YMM5 = 62,
-	GDB_CPU_X86_64_REG_YMM6 = 63,
-	GDB_CPU_X86_64_REG_YMM7 = 64,
-	GDB_CPU_X86_64_REG_YMM8 = 65,
-	GDB_CPU_X86_64_REG_YMM9 = 66,
-	GDB_CPU_X86_64_REG_YMM10 = 67,
-	GDB_CPU_X86_64_REG_YMM11 = 68,
-	GDB_CPU_X86_64_REG_YMM12 = 69,
-	GDB_CPU_X86_64_REG_YMM13 = 70,
-	GDB_CPU_X86_64_REG_YMM14 = 71,
-	GDB_CPU_X86_64_REG_YMM15 = 72,
-
-	GDB_CPU_X86_64_REG_COUNT = 73
-};
 
 void debug_init(struct debug_args *debug_args)
 {
@@ -367,6 +277,15 @@ void *regptr(int regno, struct debug_args *debug_args)
 	return reg_ptr;
 }
 
+size_t get_reg_bytes(int regno)
+{
+	if (regno < GDB_CPU_X86_64_REG_COUNT) {
+		return x86_64_regs_size[regno];
+	} else {
+		return 0;
+	}
+}
+
 static int read_reg(void *args, int regno, void *reg_value)
 {
 	struct debug_args *debug_args = (struct debug_args *)args;
@@ -569,25 +488,22 @@ static void on_interrupt(void *args __attribute__((unused)))
 	exit(EXIT_SUCCESS);
 }
 
-arch_info_t arch_info = {
-	.smp = 1,
-	.reg_num = GDB_CPU_X86_64_NUM_REGISTERS, // bho
-	.reg_byte = 0,
-	.regs_byte = x86_64_regs_size,
-	.target_desc = TARGET_X86_64 // bho
-};
+arch_info_t arch_info = { .target_desc = TARGET_X86_64,
+			  .smp = 1,
+			  .reg_num = GDB_CPU_X86_64_REG_COUNT };
 
-struct target_ops ops = {
-	.read_reg = read_reg,
-	.write_reg = write_reg,
-	.read_mem = read_mem,
-	.write_mem = write_mem,
-	.cont = cont,
-	.stepi = stepi,
-	.set_bp = set_bp,
-	.del_bp = del_bp,
-	.on_interrupt = on_interrupt,
-};
+struct target_ops ops = { .cont = cont,
+			  .stepi = stepi,
+			  .get_reg_bytes = get_reg_bytes,
+			  .read_reg = read_reg,
+			  .write_reg = write_reg,
+			  .read_mem = read_mem,
+			  .write_mem = write_mem,
+			  .set_bp = set_bp,
+			  .del_bp = del_bp,
+			  .on_interrupt = on_interrupt,
+			  .set_cpu = nullptr,
+			  .get_cpu = nullptr };
 
 void debug_start(char *debug_server, struct debug_args *debug_args)
 {

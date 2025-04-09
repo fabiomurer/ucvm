@@ -1,4 +1,4 @@
+
 [submodule "mini-gdbstub"]
 	path = mini-gdbstub
-	url = git@github.com:fabiomurer/mini-gdbstub.git
-	branch = mychanges
+	url = git@github.com:RinHizakura/mini-gdbstub.git
