@@ -1,4 +1,4 @@
-#include "utils.h"
+
 #define _GNU_SOURCE
 #include <elf.h>
 #include <errno.h>
@@ -18,7 +18,10 @@
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/prctl.h> 
+#include <signal.h>
 
+#include "utils.h"
 #include "load_linux.h"
 #include "syscall.h"
 
@@ -261,6 +264,16 @@ void load_linux(char **argv, struct linux_proc *linux_proc)
 	}
 
 	if (child == 0) {
+		//Ensure child dies if parent dies
+		if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
+			PANIC_PERROR("prctl(PR_SET_PDEATHSIG)");
+		}
+		//check if parent died between fork and here
+		if (getppid() == 1) {
+			// Parent died too quickly
+			_exit(1);
+		}
+
 		// Child process: request tracing and stop itself so the parent
 		// can attach.
 		if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1) {
