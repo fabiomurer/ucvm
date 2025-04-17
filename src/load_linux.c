@@ -18,7 +18,7 @@
 #include <sys/user.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <sys/prctl.h> 
+#include <sys/prctl.h>
 #include <signal.h>
 
 #include "utils.h"
@@ -264,11 +264,11 @@ void load_linux(char **argv, struct linux_proc *linux_proc)
 	}
 
 	if (child == 0) {
-		//Ensure child dies if parent dies
+		// Ensure child dies if parent dies
 		if (prctl(PR_SET_PDEATHSIG, SIGKILL) == -1) {
 			PANIC_PERROR("prctl(PR_SET_PDEATHSIG)");
 		}
-		//check if parent died between fork and here
+		// check if parent died between fork and here
 		if (getppid() == 1) {
 			// Parent died too quickly
 			_exit(1);

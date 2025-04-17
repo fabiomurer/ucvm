@@ -51,6 +51,20 @@ struct vm vm_create(void)
 		PANIC_PERROR("KVM_CREATE_VM");
 	}
 
+	/*
+	struct kvm_enable_cap cap = {
+		.cap = KVM_CAP_EXCEPTION_PAYLOAD,
+		.flags = 0,
+		.args = {1, 0, 0, 0},
+		.pad = {0}
+	};
+
+	if (ioctl(vm.vmfd, KVM_ENABLE_CAP, &cap) < 0) {
+		PANIC_PERROR("KVM_ENABLE_CAP");
+	}
+	*/
+
+
 	// create vcpu
 	ssize_t vcpu_mmap_size;
 	if ((vcpu_mmap_size = ioctl(vm.kvmfd, KVM_GET_VCPU_MMAP_SIZE, 0)) <= 0) {

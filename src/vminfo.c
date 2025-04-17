@@ -11,7 +11,8 @@
 #include "vsyscall.h"
 
 // https://www.sandpile.org/x86/except.htm
-char exceptions_names[][30] = { "divide error",
+char exceptions_names[][30] = { 
+				"divide error",
 				"debug",
 				"non-maskable interrupt",
 				"breakpoint",
@@ -139,4 +140,19 @@ void vcpu_regs_log(struct vm *vm)
 
 		printf("\n");
 	}
+
+	struct kvm_sregs sregs;
+	if (ioctl(vm->vcpufd, KVM_GET_SREGS, &sregs) < 0) {
+		PANIC_PERROR("KVM_GET_SREGS");
+	}
+
+	/*
+	cr2 Contains a value called Page Fault Linear Address (PFLA). 
+	When a page fault occurs, the address the program attempted to access 
+	is stored in the CR2 register. 
+	*/
+	
+	printf("sregs\n\t"
+		"cr2: %p\n",
+		(void*)sregs.cr2);
 }
