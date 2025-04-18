@@ -37,7 +37,6 @@ static struct vma *find_vma_containing(uintptr_t addr)
 	}
 	return nullptr;
 }
-nullptr_t
 
 // Helper to find the VMA starting exactly at a given address
 // Returns NULL if not found
