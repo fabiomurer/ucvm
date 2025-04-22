@@ -16,11 +16,9 @@ struct vma {
 /**
  * @brief Initializes the VMA manager with a single free block covering the entire space.
  *
- * @param base_addr The starting address of the manageable memory region.
- * @param size The total size of the manageable memory region.
  * @return true on success, false on failure (e.g., allocation error).
  */
-bool vma_init(uintptr_t base_addr, size_t size);
+bool vma_init(uintptr_t start, uintptr_t end);
 
 /**
  * @brief Cleans up the VMA manager, freeing all allocated VMA nodes.
@@ -36,6 +34,32 @@ void vma_destroy(void);
  * @return true if a suitable free area is found, false otherwise.
  */
 bool vma_find_free(size_t size, uintptr_t *out_addr);
+
+/**
+ * @brief Finds a contiguous free memory area of at least the specified size,
+ *        starting the search from the end of the address space (reverse search).
+ *
+ * @param size The minimum size required (in bytes).
+ * @param out_addr Pointer to store the start address of the found free area.
+ * @return true if a suitable free area is found, false otherwise.
+ */
+ bool vma_find_free_reverse(size_t size, uintptr_t *out_addr);
+
+ /**
+  * @brief Finds a contiguous free memory area of at least the specified size,
+  *        starting the search near a given hint address if possible.
+  *
+  * If the hint falls within a free VMA that is large enough to contain the requested
+  * size, the function will return the block that starts at the hint address. If the hint
+  * is not within a free block or the block is too small, the function will fall back to
+  * a reverse search for a suitable block.
+  *
+  * @param size The minimum size required (in bytes).
+  * @param hint The hint address to start the search near.
+  * @param out_addr Pointer to store the start address of the found free area.
+  * @return true if a suitable free area is found, false otherwise.
+  */
+ bool vma_find_free_hint(size_t size, uintptr_t hint, uintptr_t *out_addr);
 
 /**
  * @brief Reserves a specific range of memory.

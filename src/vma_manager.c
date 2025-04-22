@@ -1,6 +1,8 @@
 #include "vma_manager.h"
 #include "intrusive_dlist.h"
 #include "utils.h"
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h> // For malloc, free
 #include <assert.h>
@@ -87,18 +89,15 @@ static void merge_free_neighbors(struct vma *vma)
 	}
 }
 
-bool vma_init(uintptr_t base_addr, size_t size)
+bool vma_init(uintptr_t start, uintptr_t end)
 {
-	if (size == 0) {
-		PANIC("VMA init size cannot be zero.\n");
-	}
 	// Ensure list is empty before initialization
 	if (!dlist_empty(&vma_list)) {
 		vma_destroy(); // Clear existing list if any
 	}
 	dlist_init(&vma_list); // Re-initialize sentinel just in case
 
-	struct vma *initial_vma = create_vma(base_addr, base_addr + size, true);
+	struct vma *initial_vma = create_vma(start, end, true);
 	if (!initial_vma) {
 		return false;
 	}
@@ -136,6 +135,45 @@ bool vma_find_free(size_t size, uintptr_t *out_addr)
 		}
 	}
 	return false; // No suitable block found
+}
+
+bool vma_find_free_reverse(size_t size, uintptr_t *out_addr)
+{
+	if (size == 0) {
+		return false;
+	}
+
+	struct dlist_head *pos = nullptr;
+	dlist_for_each_reverse(pos, &vma_list)
+	{
+		struct vma *v = dlist_entry(pos, struct vma, node);
+		if (v->is_free && (v->end - v->start) >= size) {
+			*out_addr = v->end - size;
+			return true;
+		}
+	}
+	return false; // No suitable block found
+}
+
+bool vma_find_free_hint(size_t size, uintptr_t hint, uintptr_t *out_addr)
+{
+	if (size == 0) {
+		return false;
+	}
+
+	struct vma *v = find_vma_containing(hint);
+	if (v == nullptr) {
+		return false;
+	}
+
+	// exact match
+	if (v->is_free && (v->end - hint) >= size) {
+		*out_addr = hint;
+		return true;
+	}
+
+	// if hint not free ignore it.
+	return vma_find_free_reverse(size, out_addr);
 }
 
 bool vma_reserve(uintptr_t start, size_t size)
