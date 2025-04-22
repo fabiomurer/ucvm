@@ -12,7 +12,8 @@
 static DLIST_HEAD(vma_list);
 
 // Helper to create a new VMA node
-static struct vma *create_vma(uintptr_t start, uintptr_t end, bool is_free)
+static struct vma *create_vma(uintptr_t start, uintptr_t end, bool is_free, int prot, int flags,
+			      char *file, off_t offset)
 {
 	struct vma *vma = (struct vma *)malloc(sizeof(struct vma));
 	if (!vma) {
@@ -21,6 +22,11 @@ static struct vma *create_vma(uintptr_t start, uintptr_t end, bool is_free)
 	vma->start = start;
 	vma->end = end;
 	vma->is_free = is_free;
+	vma->prot = prot;
+	vma->flags = flags;
+	vma->file = file;
+	vma->offset = offset;
+
 	dlist_init(&vma->node); // Initialize node before use
 	return vma;
 }
@@ -72,7 +78,9 @@ static void merge_free_neighbors(struct vma *vma)
 		if (prev_v->is_free && prev_v->end == vma->start) {
 			prev_v->end = vma->end; // Extend previous VMA
 			dlist_del(&vma->node);	// Remove current VMA
-			free(vma);		// Free the node memory
+
+			free(vma->file);
+			free(vma);    // Free the node memory
 			vma = prev_v; // Continue merging with the (now extended) previous VMA
 		}
 	}
@@ -83,8 +91,9 @@ static void merge_free_neighbors(struct vma *vma)
 		if (next_v->is_free && vma->end == next_v->start) {
 			vma->end = next_v->end;	  // Extend current VMA
 			dlist_del(&next_v->node); // Remove next VMA
-			free(next_v);		  // Free the node memory
-						  // No need to update 'v' pointer here
+			free(vma->file);
+			free(next_v); // Free the node memory
+				      // No need to update 'v' pointer here
 		}
 	}
 }
@@ -97,7 +106,7 @@ bool vma_init(uintptr_t start, uintptr_t end)
 	}
 	dlist_init(&vma_list); // Re-initialize sentinel just in case
 
-	struct vma *initial_vma = create_vma(start, end, true);
+	struct vma *initial_vma = create_vma(start, end, true, 0, 0, nullptr, 0);
 	if (!initial_vma) {
 		return false;
 	}
@@ -113,7 +122,8 @@ void vma_destroy(void)
 	{
 		struct vma *v = dlist_entry(pos, struct vma, node);
 		dlist_del(&v->node); // Remove from list
-		free(v);	     // Free the node memory
+		free(v->file);
+		free(v); // Free the node memory
 	}
 	// Ensure the list head itself is reset
 	dlist_init(&vma_list);
@@ -176,7 +186,7 @@ bool vma_find_free_hint(size_t size, uintptr_t hint, uintptr_t *out_addr)
 	return vma_find_free_reverse(size, out_addr);
 }
 
-bool vma_reserve(uintptr_t start, size_t size)
+bool vma_reserve(uintptr_t start, size_t size, int prot, int flags, char *file, off_t offset)
 {
 	if (size == 0) {
 		return false;
@@ -201,15 +211,16 @@ bool vma_reserve(uintptr_t start, size_t size)
 	struct vma *after_vma = nullptr;
 
 	// Create the new reserved VMA
-	reserved_vma = create_vma(start, end, false);
+	reserved_vma = create_vma(start, end, false, prot, flags, file, offset);
 	if (!reserved_vma) {
 		return false; // Allocation failed
 	}
 
 	// Does a free block remain *after* the reserved block?
 	if (end < target_vma->end) {
-		after_vma = create_vma(end, target_vma->end, true);
+		after_vma = create_vma(end, target_vma->end, true, 0, 0, nullptr, 0);
 		if (!after_vma) {
+			free(reserved_vma->file);
 			free(reserved_vma);
 			return false; // Allocation failed
 		}
@@ -234,6 +245,7 @@ bool vma_reserve(uintptr_t start, size_t size)
 		}
 		// Remove the original VMA
 		dlist_del(&target_vma->node);
+		free(target_vma->file);
 		free(target_vma);
 	}
 
@@ -259,88 +271,6 @@ bool vma_delete(uintptr_t start, size_t size)
 
 	// Merge with neighbors if they are free
 	merge_free_neighbors(target_vma);
-
-	return true;
-}
-
-bool vma_expand(uintptr_t start, size_t old_size, size_t new_size)
-{
-	if (new_size <= old_size || new_size == 0 || old_size == 0) {
-		return false;
-	}
-
-	uintptr_t old_end = start + old_size;
-	uintptr_t new_end = start + new_size;
-
-	struct vma *target_vma = find_vma_starting_at(start);
-
-	// Check if found, is reserved, and old size matches
-	if (!target_vma || target_vma->is_free || target_vma->end != old_end) {
-		return false;
-	}
-
-	// Check the next VMA
-	if (target_vma->node.next == &vma_list) {
-		return false; // No next VMA to expand into
-	}
-
-	struct vma *next_vma = dlist_entry(target_vma->node.next, struct vma, node);
-
-	// Check if next is free and large enough
-	if (!next_vma->is_free || next_vma->end < new_end) {
-		return false; // Next VMA is not free or not large enough
-	}
-
-	// Expansion is possible
-	size_t expansion_needed = new_size - old_size;
-	size_t next_vma_original_size = next_vma->end - next_vma->start;
-
-	// Update target VMA's end
-	target_vma->end = new_end;
-
-	// Update or remove next VMA
-	if (next_vma_original_size == expansion_needed) {
-		// Next VMA is consumed entirely
-		dlist_del(&next_vma->node);
-		free(next_vma);
-	} else {
-		// Shrink next VMA from the start
-		next_vma->start = new_end;
-	}
-
-	return true;
-}
-
-bool vma_shrink(uintptr_t start, size_t old_size, size_t new_size)
-{
-	if (new_size >= old_size || new_size == 0 || old_size == 0) {
-		return false;
-	}
-
-	uintptr_t old_end = start + old_size;
-	uintptr_t new_end = start + new_size;
-
-	struct vma *target_vma = find_vma_starting_at(start);
-
-	// Check if found, is reserved, and old size matches
-	if (!target_vma || target_vma->is_free || target_vma->end != old_end) {
-		return false;
-	}
-
-	// Create the new free VMA for the shrunk portion
-	struct vma *shrunk_part = create_vma(new_end, old_end, true);
-	if (!shrunk_part) {
-		return false; // Allocation failed
-	}
-
-	// Update the original VMA's end
-	target_vma->end = new_end;
-
-	// Insert the new free VMA immediately after the target VMA
-	dlist_add(&shrunk_part->node, &target_vma->node);
-
-	// Try merging the newly created free VMA with the *next* one (if it exists and is free)
-	merge_free_neighbors(shrunk_part);
 
 	return true;
 }

@@ -4,12 +4,20 @@
 #include <stdint.h> // For uintptr_t
 #include <stdbool.h>
 #include <stddef.h> // For size_t
+#include <stdio.h>
 
 // Structure to represent a Virtual Memory Area (VMA)
 struct vma {
-	uintptr_t start;	// Start address of the area
-	uintptr_t end;		// End address of the area (exclusive: [start, end))
-	bool is_free;		// Flag indicating if the area is free or reserved
+	uintptr_t start; // Start address of the area
+	uintptr_t end;	 // End address of the area (exclusive: [start, end))
+	bool is_free;	 // Flag indicating if the area is free or reserved
+
+	// linux
+	int prot;
+	int flags;
+	char *file;
+	off_t offset;
+
 	struct dlist_head node; // Intrusive list node
 };
 
@@ -43,23 +51,23 @@ bool vma_find_free(size_t size, uintptr_t *out_addr);
  * @param out_addr Pointer to store the start address of the found free area.
  * @return true if a suitable free area is found, false otherwise.
  */
- bool vma_find_free_reverse(size_t size, uintptr_t *out_addr);
+bool vma_find_free_reverse(size_t size, uintptr_t *out_addr);
 
- /**
-  * @brief Finds a contiguous free memory area of at least the specified size,
-  *        starting the search near a given hint address if possible.
-  *
-  * If the hint falls within a free VMA that is large enough to contain the requested
-  * size, the function will return the block that starts at the hint address. If the hint
-  * is not within a free block or the block is too small, the function will fall back to
-  * a reverse search for a suitable block.
-  *
-  * @param size The minimum size required (in bytes).
-  * @param hint The hint address to start the search near.
-  * @param out_addr Pointer to store the start address of the found free area.
-  * @return true if a suitable free area is found, false otherwise.
-  */
- bool vma_find_free_hint(size_t size, uintptr_t hint, uintptr_t *out_addr);
+/**
+ * @brief Finds a contiguous free memory area of at least the specified size,
+ *        starting the search near a given hint address if possible.
+ *
+ * If the hint falls within a free VMA that is large enough to contain the requested
+ * size, the function will return the block that starts at the hint address. If the hint
+ * is not within a free block or the block is too small, the function will fall back to
+ * a reverse search for a suitable block.
+ *
+ * @param size The minimum size required (in bytes).
+ * @param hint The hint address to start the search near.
+ * @param out_addr Pointer to store the start address of the found free area.
+ * @return true if a suitable free area is found, false otherwise.
+ */
+bool vma_find_free_hint(size_t size, uintptr_t hint, uintptr_t *out_addr);
 
 /**
  * @brief Reserves a specific range of memory.
@@ -70,7 +78,7 @@ bool vma_find_free(size_t size, uintptr_t *out_addr);
  * @return true on success, false if the range is invalid, not free,
  *         or spans multiple VMAs, or on allocation error.
  */
-bool vma_reserve(uintptr_t start, size_t size);
+bool vma_reserve(uintptr_t start, size_t size, int prot, int flags, char *file, off_t offset);
 
 /**
  * @brief Deletes (frees) a specific range of memory.

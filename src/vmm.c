@@ -7,9 +7,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 
 #include "utils.h"
 #include "intrusive_dlist.h"
+#include "vma_manager.h"
 
 static void *guest_memory;
 static struct memory_chunk pml4t_addr;
@@ -273,6 +275,22 @@ int add_free_pfn(size_t pfn)
 
 	// frame with the pfn is already in a list
 	return -1;
+}
+
+#define LINUX_VMA_START 0x0
+#define LINUX_VMA_END 0x7ffffffff000
+
+void vmm_init()
+{
+	free_frames_list_init();
+	if (!vma_init(LINUX_VMA_START, LINUX_VMA_END)) {
+		PANIC("vma_init");
+	}
+}
+
+void *vmm_mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
+{
+	char *filename = nullptr;
 }
 
 struct memory_chunk get_free_memory_chunk(size_t pages_count)

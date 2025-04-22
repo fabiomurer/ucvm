@@ -64,7 +64,6 @@ struct vm vm_create(void)
 	}
 	*/
 
-
 	// create vcpu
 	ssize_t vcpu_mmap_size;
 	if ((vcpu_mmap_size = ioctl(vm.kvmfd, KVM_GET_VCPU_MMAP_SIZE, 0)) <= 0) {
