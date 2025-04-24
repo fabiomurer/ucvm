@@ -1,3 +1,4 @@
+#include "view_linux.h"
 #define _GNU_SOURCE
 #include "vsyscall.h"
 
@@ -43,30 +44,14 @@ bool is_syscall(struct vm *vm, struct kvm_regs *regs)
 	}
 }
 
-uint64_t vlinux_syscall_brk(struct linux_proc *linux_proc, uint64_t addr)
+uint64_t vlinux_syscall_brk(struct linux_view *linux_view, uint64_t addr)
 {
 	/*
 	the actual Linux system call returns the new program
 	break on success.  On failure, the system call returns the current
 	break.
 	*/
-	if (addr == 0) {
-		return linux_proc->brk;
-	}
-
-	if (addr >= linux_proc->brk) {
-		u_int64_t increment = (u_int64_t)addr - linux_proc->brk;
-
-		alloc_memory(linux_proc->brk, increment);
-
-		linux_proc->brk += increment;
-		return linux_proc->brk;
-	} else {
-		// shrink with brk not supported
-		fprintf(stderr, "brk shrink not supported\n");
-	}
-
-	return linux_proc->brk;
+	return linux_view_do_syscall(linux_view, __NR_brk, addr, 0, 0, 0, 0, 0);
 }
 
 uint64_t vlinux_syscall_arch_prctl(struct vm *vm, uint64_t op, uint64_t addr)
@@ -99,7 +84,7 @@ uint64_t vlinux_syscall_arch_prctl(struct vm *vm, uint64_t op, uint64_t addr)
 			printf(#nr "\n");      \
 		}
 
-uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kvm_regs *regs)
+uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 {
 	uint64_t sysno = regs->rax;
 	uint64_t arg1 = regs->rdi;
@@ -199,7 +184,7 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		break;
 
 		HANDLE_SYSCALL(__NR_brk)
-		ret = vlinux_syscall_brk(linux_proc, arg1);
+		ret = vlinux_syscall_brk(&vm->linux_view, arg1);
 		break;
 
 		HANDLE_SYSCALL(__NR_access)
@@ -231,7 +216,6 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		The system call set_tid_address() sets the clear_child_tid value
 		for the calling thread to tidptr.
 		*/
-		linux_proc->clear_child_tid = arg1;
 
 		/*
 		set_tid_address() always returns the caller's thread ID.
@@ -269,7 +253,7 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		// support only get process path
 		if (strcmp("/proc/self/exe", pathname) == 0 && dirfd == AT_FDCWD) {
 			char buf[PATH_MAX] = "\0";
-			if (realpath(linux_proc->argv[0], buf) == NULL) {
+			if (realpath(vm->linux_view.argv[0], buf) == NULL) {
 				PANIC_PERROR("realpath");
 			}
 			ret = strlen(buf);
@@ -291,7 +275,7 @@ uint64_t syscall_handler(struct vm *vm, struct linux_proc *linux_proc, struct kv
 		argument should be sizeof(*head).
 		*/
 		if (arg2 == sizeof(struct robust_list_head)) {
-			linux_proc->robust_list_head_ptr = arg1;
+			//linux_proc->robust_list_head_ptr = arg1;
 			ret = 0;
 		} else {
 			ret = -1;

@@ -5,7 +5,9 @@
 #include <sys/user.h>
 
 struct linux_view {
+	char **argv;
 	pid_t pid;
+	int memfd;
 };
 
 void create_linux_view(char **argv, struct linux_view* linux_view);

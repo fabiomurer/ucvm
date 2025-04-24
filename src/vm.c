@@ -8,7 +8,6 @@
 #include <fcntl.h>
 #include <linux/kvm.h>
 #include <sched.h>
-#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -20,7 +19,6 @@
 #include <unistd.h>
 
 #include "arguments.h"
-#include "load_kvm.h"
 #include "view_linux.h"
 #include "utils.h"
 #include "vminfo.h"
@@ -354,6 +352,12 @@ int vm_run(struct vm *vm)
 	return vm->run->exit_reason;
 }
 
+void page_fault_handler(uint64_t cr2) 
+{
+	uint64_t missing_page_addr = TRUNC_PG(cr2);
+	map_page(missing_page_addr);
+}
+
 void vm_exit_handler(int exit_code, struct vm *vm)
 {
 	switch (exit_code) {
@@ -377,7 +381,7 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 			PANIC_PERROR("KVM_GET_REGS");
 		}
 		if (is_syscall(vm, &regs)) {
-			if (syscall_handler(vm, linux_proc, &regs) == ENOSYS) {
+			if (syscall_handler(vm, &regs) == ENOSYS) {
 				vcpu_events_logs(vm);
 				vcpu_regs_log(vm);
 				exit(-1);
@@ -389,10 +393,28 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 				PANIC_PERROR("KVM_SET_REGS");
 			}
 		} else {
-			printf("unespected shutdown\n");
-			vcpu_events_logs(vm);
-			vcpu_regs_log(vm);
-			exit(-1);
+
+			struct kvm_sregs sregs;
+			if (ioctl(vm->vcpufd, KVM_GET_SREGS, &sregs) < 0) {
+				PANIC_PERROR("KVM_GET_SREGS");
+			}
+
+			// page fault
+			if (sregs.cr2 != 0) {
+				page_fault_handler(sregs.cr2);
+
+				sregs.cr2 = 0;
+				if (ioctl(vm->vcpufd, KVM_SET_SREGS, &sregs) < 0) {
+					PANIC_PERROR("KVM_SET_SREGS");
+				}
+			}
+
+			else {
+				printf("unespected shutdown\n");
+				vcpu_events_logs(vm);
+				vcpu_regs_log(vm);
+				exit(-1);
+			}	
 		}
 		break;
 	case KVM_EXIT_FAIL_ENTRY:

@@ -22,8 +22,6 @@ struct memory_chunk {
 	uintptr_t guest; // guest real address
 };
 
-struct memory_chunk get_free_memory_chunk(size_t pages_count);
-struct memory_chunk alloc_pages(uint64_t guest_vaddr, size_t pages_count);
-struct memory_chunk alloc_memory(uint64_t guest_vaddr, size_t length);
+uintptr_t map_page(uint64_t vaddr);
 
 void cpu_init_long(struct kvm_sregs2 *sregs, void *memory);

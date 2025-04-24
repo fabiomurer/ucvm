@@ -1,4 +1,5 @@
 
+#include <stddef.h>
 #define _GNU_SOURCE
 #include <elf.h>
 #include <errno.h>
@@ -111,6 +112,27 @@ void linux_view_worker_init(char **argv)
 	exit(EXIT_FAILURE);
 }
 
+int open_proc_mem(pid_t pid) 
+{
+	char mem_path[PATH_MAX];
+    int memfd;
+
+    
+    int path_len = snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", pid);
+
+    if (path_len < 0 || (size_t)path_len >= sizeof(mem_path)) {
+        return -1;
+    }
+
+    memfd = open(mem_path, O_RDONLY);
+    
+    if (memfd == -1) {
+        return -1;
+    }
+
+    return memfd;
+}
+
 void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
 {
 	int status = 0;
@@ -142,16 +164,22 @@ void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
 
 	// Check if this stop is due to the exec event.
 	if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP &&
-	    (status >> 16) == PTRACE_EVENT_EXEC) {
+	    (status >> 16) != PTRACE_EVENT_EXEC) {
+		PANIC("Unexpected stop before exec event occurred.");
+	}
+
 #ifdef DEBUG
-		printf("process with pid: %d is loaded and stopped\n", child);
+	printf("process with pid: %d is loaded and stopped\n", child);
 #endif
 
-		// disable VDSO
-		remove_vdso(child);
-		linux_view->pid = child;
-	} else {
-		PANIC("Unexpected stop before exec event occurred.");
+	// disable VDSO
+	remove_vdso(child);
+	linux_view->pid = child;
+
+	// open the memory file 
+	linux_view->memfd = open_proc_mem(child);
+	if (linux_view->memfd < 0) {
+		PANIC("open_proc_mem");
 	}
 }
 
@@ -168,6 +196,8 @@ void create_linux_view(char **argv, struct linux_view *linux_view)
 	} else {
 		linux_view_manager_init(child, linux_view);
 	}
+
+	linux_view->argv = argv;
 }
 
 
@@ -178,6 +208,17 @@ void linux_view_get_regs(struct linux_view* view, struct user_regs_struct* regs)
 	}
 }
 
+int linux_view_read_mem(struct linux_view* view, off_t src, void* dest, size_t len)
+{
+	ssize_t nread = pread(view->memfd, dest, len, src);
+
+	// has to read exact number of byte
+	if (nread < 0 || (size_t)nread >= len) {
+		return -1;
+	}
+
+	return 0;
+}
 
 uint64_t linux_view_do_syscall(struct linux_view* view, uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {

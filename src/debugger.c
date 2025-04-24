@@ -47,7 +47,7 @@ void debug_cycle(struct debug_args *debug_args)
 
 	int exit_code;
 	while ((exit_code = vm_run(debug_args->vm)) != KVM_EXIT_DEBUG) {
-		vm_exit_handler(exit_code, debug_args->vm, debug_args->linux_proc);
+		vm_exit_handler(exit_code, debug_args->vm);
 	}
 
 	// read all registers

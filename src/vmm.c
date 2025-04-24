@@ -275,26 +275,20 @@ int add_free_pfn(size_t pfn)
 	return -1;
 }
 
-struct memory_chunk get_free_memory_chunk(size_t pages_count)
-{
-	static size_t first_free_page = 0;
+uintptr_t pfn_to_hostptr(size_t pfn) {
+	return (uint64_t)guest_memory + (pfn * PAGE_SIZE);
+}
 
-	if (first_free_page + pages_count >= PAGE_NUMBER) {
-		PANIC("NOT ENOUGHT MEMORY");
+int get_free_frame(uintptr_t* guest_addr)
+{
+	size_t pfn = 0;
+	int err = get_free_pfn( &pfn);
+	if (err != 0) {
+		return err;
 	}
 
-	uint64_t index = PAGE_SIZE * first_free_page;
-	uint64_t host = (uint64_t)guest_memory + index;
-	uint64_t guest = GUEST_PHYS_ADDR + index;
-
-	uint64_t chunk_size = PAGE_SIZE * pages_count;
-	memset((void *)host, 0, chunk_size);
-
-	first_free_page += pages_count;
-
-	struct memory_chunk mem = { .size = chunk_size, .host = host, .guest = guest };
-
-	return mem;
+	*guest_addr = pfn_to_hostptr(pfn);
+	return 0;
 }
 
 #define PAGE_TABLE_LEVELS 4
@@ -371,84 +365,25 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 #ifdef DEBUG
 			printf("Allocating level %zu\n", i);
 #endif
-			*g_a = get_free_memory_chunk(1).guest | PAGE_FLAGS;
+		uintptr_t new_frame = 0;
+		if (get_free_frame(&new_frame) != 0) {
+			PANIC("get_free_frame");
+		}
+			*g_a = new_frame | PAGE_FLAGS;
 		}
 		cur_addr = from_guest(*g_a);
 	}
 }
 
-bool segment_already_mapped(uint64_t vaddr)
+
+uintptr_t map_page(uint64_t vaddr)
 {
-	size_t i = 0;
-
-	struct memory_chunk cur_addr = pml4t_addr;
-	uint64_t ind[PAGE_TABLE_LEVELS] = {
-		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
-		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
-		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
-		(vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3,
-	};
-
-	// if not alligned
-	vaddr = TRUNC_PG(vaddr);
-
-	// map page walk
-	for (i = 0; i < PAGE_TABLE_LEVELS; i++) {
-		uint64_t *g_a = (uint64_t *)(cur_addr.host + ind[i] * sizeof(uint64_t));
-
-		// if last level
-		if (i == PAGE_TABLE_LEVELS - 1) {
-			if (*g_a)
-				return true;
-			else
-				return false;
-		}
-		// if the part of the current level is not mapped, page is not
-		// mapped
-		if (!*g_a)
-			return false;
-
-		cur_addr = from_guest(*g_a);
+	uintptr_t guest_addr = 0;
+	int err = get_free_frame(&guest_addr);
+	if (err != 0) {
+		PANIC("get_free_frame");
 	}
-	return false;
-}
 
-void map_range(uint64_t vaddr, uint64_t phys_addr, size_t pages_count)
-{
-	size_t mapped;
-
-#ifdef DEBUG
-	printf("Mapping range from %lx to %lx\n", vaddr, vaddr + pages_count * PAGE_SIZE);
-#endif
-
-	for (mapped = 0; mapped < pages_count; mapped++) {
-		if (!segment_already_mapped(vaddr)) {
-			map_addr(vaddr, phys_addr);
-		} else {
-#ifdef DEBUG
-			fprintf(stderr, "segment already mapped\n");
-#endif
-		}
-		vaddr += PAGE_SIZE;
-		phys_addr += PAGE_SIZE;
-	}
-}
-
-struct memory_chunk alloc_pages(uint64_t guest_vaddr, size_t pages_count)
-{
-	struct memory_chunk mem = get_free_memory_chunk(pages_count);
-
-	map_range(guest_vaddr, mem.guest, pages_count);
-	return mem;
-}
-
-struct memory_chunk alloc_memory(uint64_t guest_vaddr, size_t length)
-{
-	uint64_t start_addr = ROUND_PG(guest_vaddr);
-	uint64_t end_addr = ROUND_PG(guest_vaddr + length);
-	size_t pages_count = (end_addr - start_addr) / PAGE_SIZE;
-
-	struct memory_chunk mem = alloc_pages(start_addr, pages_count);
-
-	return mem;
+	map_addr(vaddr, guest_addr);
+	return guest_addr;
 }

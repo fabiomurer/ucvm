@@ -90,21 +90,18 @@ int main(int argc, char *argv[])
 		arguments.program_args_count = argc - separator_pos - 1;
 	}
 
-	struct linux_proc linux_proc;
-	linux_proc.argv = arguments.program_args;
-
 	struct vm vm = vm_create();
 	vm_init(&vm);
-	vm_load_program(&vm, &linux_proc);
+	vm_load_program(&vm, argv);
 	if (arguments.debug_server != NULL) {
-		struct debug_args debug_args = { .vm = &vm, .linux_proc = &linux_proc };
+		struct debug_args debug_args = { .vm = &vm };
 
 		vm_set_debug(&vm, true);
 		debug_start(arguments.debug_server, &debug_args);
 	} else {
 		while (true) {
 			int exit_code = vm_run(&vm);
-			vm_exit_handler(exit_code, &vm, &linux_proc);
+			vm_exit_handler(exit_code, &vm);
 		}
 	}
 }

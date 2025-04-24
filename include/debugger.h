@@ -125,7 +125,6 @@ struct breakpoint {
 
 struct debug_args {
 	struct vm *vm;
-	struct linux_proc *linux_proc;
 	struct breakpoint breakpoints[BREAKPOINTS_MAX_NUM];
 	struct kvm_regs regs;
 	struct kvm_sregs2 sregs;
