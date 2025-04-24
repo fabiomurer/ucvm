@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "utils.h"
+#include "intrusive_dlist.h"
 
 static void *guest_memory;
 static struct memory_chunk pml4t_addr;
@@ -224,6 +225,54 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 	sregs->fs = data_segment;
 	// thread-specific data structures
 	sregs->gs = data_segment;
+}
+
+struct frame {
+	size_t pfn;
+	struct dlist_head list;
+};
+
+static struct frame frames_pool[PAGE_NUMBER] = { 0 };
+
+static DLIST_HEAD(free_frames_list);
+
+void free_frames_list_init(void)
+{
+	for (size_t i = 0; i < PAGE_NUMBER; i++) {
+		frames_pool[i].pfn = i;
+		dlist_init(&frames_pool[i].list);
+		dlist_add_tail(&frames_pool[i].list, &free_frames_list);
+	}
+}
+
+int get_free_pfn(size_t *pfn)
+{
+	struct dlist_head *node = dlist_pop(&free_frames_list);
+	if (node != nullptr) {
+		struct frame *frame = dlist_entry(node, struct frame, list);
+		*pfn = frame->pfn;
+		return 0;
+	}
+
+	// no free frames
+	return -1;
+}
+
+int add_free_pfn(size_t pfn)
+{
+	// pfn not valid
+	if (pfn >= PAGE_NUMBER) {
+		return -1;
+	}
+
+	struct frame *frame = &frames_pool[pfn];
+	if (!dlist_empty(&frame->list)) {
+		dlist_push(&frame->list, &free_frames_list);
+		return 0;
+	}
+
+	// frame with the pfn is already in a list
+	return -1;
 }
 
 struct memory_chunk get_free_memory_chunk(size_t pages_count)
