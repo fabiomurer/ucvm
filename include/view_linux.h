@@ -1,0 +1,15 @@
+#pragma once
+
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/user.h>
+
+struct linux_view {
+	pid_t pid;
+};
+
+void create_linux_view(char **argv, struct linux_view* linux_view);
+
+void linux_view_get_regs(struct linux_view* view, struct user_regs_struct* regs);
+
+uint64_t linux_view_do_syscall(struct linux_view* view, uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5);

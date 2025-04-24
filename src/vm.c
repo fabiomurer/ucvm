@@ -1,3 +1,4 @@
+#include <sys/user.h>
 #define _GNU_SOURCE
 #include "vm.h"
 
@@ -20,7 +21,7 @@
 
 #include "arguments.h"
 #include "load_kvm.h"
-#include "load_linux.h"
+#include "view_linux.h"
 #include "utils.h"
 #include "vminfo.h"
 #include "vmm.h"
@@ -320,9 +321,9 @@ void clear_regs(struct kvm_regs *regs)
 	regs->rip = 0;
 }
 
-void vm_load_program(struct vm *vm, struct linux_proc *linux_proc)
+void vm_load_program(struct vm *vm, char** argv)
 {
-	load_linux(linux_proc->argv, linux_proc);
+	create_linux_view(argv, &vm->linux_view);
 
 	// update vcpu
 	struct kvm_regs regs;
@@ -330,25 +331,18 @@ void vm_load_program(struct vm *vm, struct linux_proc *linux_proc)
 		PANIC_PERROR("KVM_GET_REGS");
 	}
 
-	clear_regs(&regs); // clear some leftover junk buy ??
+	clear_regs(&regs); // clear some leftover junk ??
 
-	regs.rip = linux_proc->rip;
-	regs.rsp = linux_proc->rsp;
+	struct user_regs_struct linux_view_regs;
+	linux_view_get_regs(&vm->linux_view, &linux_view_regs);
+
+	regs.rip = linux_view_regs.rip;
+	regs.rsp = linux_view_regs.rsp;
 	regs.rflags = 0x202; // linux sets up like this
 
 	if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_SET_REGS");
 	}
-
-	load_kvm(linux_proc->pid);
-
-	// kill traced process
-	if (kill(linux_proc->pid, SIGKILL) == -1) {
-		PANIC_PERROR("kill");
-	}
-
-	int status;
-	waitpid(linux_proc->pid, &status, 0);
 }
 
 int vm_run(struct vm *vm)
@@ -360,7 +354,7 @@ int vm_run(struct vm *vm)
 	return vm->run->exit_reason;
 }
 
-void vm_exit_handler(int exit_code, struct vm *vm, struct linux_proc *linux_proc)
+void vm_exit_handler(int exit_code, struct vm *vm)
 {
 	switch (exit_code) {
 	case KVM_EXIT_DEBUG:
