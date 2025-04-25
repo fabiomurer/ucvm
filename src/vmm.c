@@ -1,5 +1,3 @@
-#include "vmm.h"
-
 #include <linux/const.h>
 #include <linux/kvm.h>
 #include <stdbool.h>
@@ -8,11 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "vmm.h"
 #include "utils.h"
 #include "intrusive_dlist.h"
 
 static void *guest_memory;
-static struct memory_chunk pml4t_addr;
+static struct frame pml4t_addr;
 
 /*
 GDT entry 8 bytes long -> 64 bits
@@ -144,94 +143,6 @@ static struct kvm_segment seg_from_desc(struct seg_desc e, uint32_t idx)
 	return res;
 }
 
-#define CRO_PROTECTED_MODE (1ULL << 0)
-#define CR0_ENABLE_PAGING (1ULL << 31)
-#define CR4_ENABLE_PAE (1ULL << 5)
-#define CR4_ENABLE_PGE (1ULL << 7)
-
-/*
-bit 10
-
-Description: Indicates whether long mode is active. This bit is read-only and is
-set by the processor when entering long mode.
-- Values:
-    - 0: Long mode is not active
-    - 1: Long mode is active
-*/
-#define EFER_LONG_MODE_ENABLED (1ULL << 8)
-#define EFER_LONG_MODE_ACTIVE (1ULL << 10)
-
-/*
-bit 11
-
-Description: Enables the no-execute page protection feature, which prevents code
-execution from data pages.
-
-- Values:
-    -0: No-execute page protection is disabled
-    - 1: No-execute page protection is enabled
-*/
-#define EFER_NO_EXECUTE_ENABLE (1ULL << 11)
-
-void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
-{
-	guest_memory = memory;
-	// alloc one page for GDT (used) IDT (not used)
-	pml4t_addr = get_free_memory_chunk(1);
-	struct memory_chunk mem_gdt = get_free_memory_chunk(1);
-	void *gdt_addr = (void *)(mem_gdt.host + GDT_OFFSET);
-
-	struct kvm_segment code_segment = seg_from_desc(CODE_SEG, 1);
-	struct kvm_segment data_segment = seg_from_desc(DATA_SEG, 2);
-
-	// null descriptor
-	memset(gdt_addr, 0, 8);
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpointer-arith"
-	// one code segment
-	memcpy(gdt_addr + 8, &CODE_SEG, 8);
-	// one data segment
-	memcpy(gdt_addr + 16, &DATA_SEG, 8);
-#pragma GCC diagnostic pop
-
-	// start address of gdt in guest
-	sregs->gdt.base = GDT_OFFSET + mem_gdt.guest;
-	// size of the table (2 entry, 1 null)
-	sregs->gdt.limit = 3 * 8 - 1;
-
-	// IDT (interrupt description table) initialization, all null not used
-	memset((void *)(mem_gdt.host + IDT_OFFSET), 0, 8);
-	// start address of IDT in guest
-	sregs->idt.base = IDT_OFFSET + mem_gdt.guest;
-	// IDT size (one null)
-	sregs->idt.limit = 7;
-
-	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
-	sregs->cr3 = (uint64_t)pml4t_addr.guest;
-	sregs->cr4 |= CR4_ENABLE_PAE | CR4_ENABLE_PGE;
-	sregs->efer |= EFER_LONG_MODE_ENABLED | EFER_LONG_MODE_ACTIVE; // EFER_LONG_MODE_ENABLED??
-
-	// initialize segments for long mode
-	// code segment
-	sregs->cs = code_segment;
-	// data segment
-	sregs->ds = data_segment;
-	// stack segment
-	sregs->ss = data_segment;
-	// additional data and string operation
-	sregs->es = data_segment;
-	// thread-specific data structures
-	sregs->fs = data_segment;
-	// thread-specific data structures
-	sregs->gs = data_segment;
-}
-
-struct frame {
-	size_t pfn;
-	struct dlist_head list;
-};
-
 static struct frame frames_pool[PAGE_NUMBER] = { 0 };
 
 static DLIST_HEAD(free_frames_list);
@@ -240,6 +151,9 @@ void free_frames_list_init(void)
 {
 	for (size_t i = 0; i < PAGE_NUMBER; i++) {
 		frames_pool[i].pfn = i;
+		frames_pool[i].host_virtual_addr = (uint64_t)guest_memory + (i * PAGE_SIZE);
+		frames_pool[i].guest_physical_addr = (uint64_t)GUEST_PHYS_ADDR + (i * PAGE_SIZE);
+
 		dlist_init(&frames_pool[i].list);
 		dlist_add_tail(&frames_pool[i].list, &free_frames_list);
 	}
@@ -275,11 +189,7 @@ int add_free_pfn(size_t pfn)
 	return -1;
 }
 
-uintptr_t pfn_to_hostptr(size_t pfn) {
-	return (uint64_t)guest_memory + (pfn * PAGE_SIZE);
-}
-
-int get_free_frame(uintptr_t* guest_addr)
+int get_free_frame(struct frame* frame)
 {
 	size_t pfn = 0;
 	int err = get_free_pfn( &pfn);
@@ -287,8 +197,102 @@ int get_free_frame(uintptr_t* guest_addr)
 		return err;
 	}
 
-	*guest_addr = pfn_to_hostptr(pfn);
+	frame->pfn = frames_pool[pfn].pfn;
+	frame->host_virtual_addr = frames_pool[pfn].host_virtual_addr;
+	frame->guest_physical_addr = frames_pool[pfn].guest_physical_addr;
 	return 0;
+}
+
+#define CRO_PROTECTED_MODE (1ULL << 0)
+#define CR0_ENABLE_PAGING (1ULL << 31)
+#define CR4_ENABLE_PAE (1ULL << 5)
+#define CR4_ENABLE_PGE (1ULL << 7)
+
+/*
+bit 10
+
+Description: Indicates whether long mode is active. This bit is read-only and is
+set by the processor when entering long mode.
+- Values:
+    - 0: Long mode is not active
+    - 1: Long mode is active
+*/
+#define EFER_LONG_MODE_ENABLED (1ULL << 8)
+#define EFER_LONG_MODE_ACTIVE (1ULL << 10)
+
+/*
+bit 11
+
+Description: Enables the no-execute page protection feature, which prevents code
+execution from data pages.
+
+- Values:
+    -0: No-execute page protection is disabled
+    - 1: No-execute page protection is enabled
+*/
+#define EFER_NO_EXECUTE_ENABLE (1ULL << 11)
+
+void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
+{
+	guest_memory = memory;
+
+	free_frames_list_init();
+
+	// alloc one page for GDT (used) IDT (not used)
+	if (get_free_frame(&pml4t_addr) != 0) {
+		PANIC("get_free_frame");
+	}
+	struct frame mem_gdt = {0};
+	if (get_free_frame(&mem_gdt) != 0) {
+		PANIC("get_free_frame");
+	}
+
+	void *gdt_addr = (void *)(mem_gdt.host_virtual_addr + GDT_OFFSET);
+
+	struct kvm_segment code_segment = seg_from_desc(CODE_SEG, 1);
+	struct kvm_segment data_segment = seg_from_desc(DATA_SEG, 2);
+
+	// null descriptor
+	memset(gdt_addr, 0, 8);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpointer-arith"
+	// one code segment
+	memcpy(gdt_addr + 8, &CODE_SEG, 8);
+	// one data segment
+	memcpy(gdt_addr + 16, &DATA_SEG, 8);
+#pragma GCC diagnostic pop
+
+	// start address of gdt in guest
+	sregs->gdt.base = GDT_OFFSET + mem_gdt.guest_physical_addr;
+	// size of the table (2 entry, 1 null)
+	sregs->gdt.limit = 3 * 8 - 1;
+
+	// IDT (interrupt description table) initialization, all null not used
+	memset((void *)(mem_gdt.host_virtual_addr + IDT_OFFSET), 0, 8);
+	// start address of IDT in guest
+	sregs->idt.base = IDT_OFFSET + mem_gdt.guest_physical_addr;
+	// IDT size (one null)
+	sregs->idt.limit = 7;
+
+	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
+	sregs->cr3 = (uint64_t)pml4t_addr.guest_physical_addr;
+	sregs->cr4 |= CR4_ENABLE_PAE | CR4_ENABLE_PGE;
+	sregs->efer |= EFER_LONG_MODE_ENABLED | EFER_LONG_MODE_ACTIVE; // EFER_LONG_MODE_ENABLED??
+
+	// initialize segments for long mode
+	// code segment
+	sregs->cs = code_segment;
+	// data segment
+	sregs->ds = data_segment;
+	// stack segment
+	sregs->ss = data_segment;
+	// additional data and string operation
+	sregs->es = data_segment;
+	// thread-specific data structures
+	sregs->fs = data_segment;
+	// thread-specific data structures
+	sregs->gs = data_segment;
 }
 
 #define PAGE_TABLE_LEVELS 4
@@ -313,16 +317,16 @@ int get_free_frame(uintptr_t* guest_addr)
 
 #define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB)
 // ?
-struct memory_chunk from_guest(uint64_t gaddr)
+struct frame jump_next_frame(uint64_t gaddr)
 {
 	// rounds gaddr down to the nearest multiple of PAGE_SIZE
 	gaddr = (gaddr / PAGE_SIZE) * PAGE_SIZE;
-	struct memory_chunk mem = {
-		.guest = gaddr,
-		.host = (uint64_t)guest_memory + (gaddr - GUEST_PHYS_ADDR),
+	struct frame frame = {
+		.guest_physical_addr = gaddr,
+		.host_virtual_addr = (uint64_t)guest_memory + (gaddr - GUEST_PHYS_ADDR),
 	};
 
-	return mem;
+	return frame;
 }
 
 // set 4 level page table for address translation
@@ -333,8 +337,8 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 #endif
 
 	size_t i = 0;
-	struct memory_chunk cur_addr = pml4t_addr;
-	uint64_t ind[PAGE_TABLE_LEVELS] = {
+	struct frame cur_addr = pml4t_addr;
+	const uint64_t ind[PAGE_TABLE_LEVELS] = {
 		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
 		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
 		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
@@ -348,7 +352,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 
 	// map page walk
 	for (i = 0; i < PAGE_TABLE_LEVELS; i++) {
-		uint64_t *g_a = (uint64_t *)(cur_addr.host + ind[i] * sizeof(uint64_t));
+		uint64_t *g_a = (uint64_t *)(cur_addr.host_virtual_addr + ind[i] * sizeof(uint64_t));
 
 		// if last level
 		if (i == PAGE_TABLE_LEVELS - 1) {
@@ -365,25 +369,25 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 #ifdef DEBUG
 			printf("Allocating level %zu\n", i);
 #endif
-		uintptr_t new_frame = 0;
+		struct frame new_frame = {0};
 		if (get_free_frame(&new_frame) != 0) {
 			PANIC("get_free_frame");
 		}
-			*g_a = new_frame | PAGE_FLAGS;
+			*g_a = new_frame.guest_physical_addr | PAGE_FLAGS;
 		}
-		cur_addr = from_guest(*g_a);
+		cur_addr = jump_next_frame(*g_a);
 	}
 }
 
 
 uintptr_t map_page(uint64_t vaddr)
 {
-	uintptr_t guest_addr = 0;
-	int err = get_free_frame(&guest_addr);
+	struct frame frame = {0};
+	int err = get_free_frame(&frame);
 	if (err != 0) {
 		PANIC("get_free_frame");
 	}
 
-	map_addr(vaddr, guest_addr);
-	return guest_addr;
+	map_addr(vaddr, frame.host_virtual_addr);
+	return frame.host_virtual_addr;
 }

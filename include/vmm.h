@@ -3,8 +3,10 @@
 #include <linux/kvm.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/user.h> // for PAGE_SIZE
 
-#define PAGE_SIZE 4096
+#include "intrusive_dlist.h"
+
 #define PAGE_NUMBER 10000
 #define MEMORY_SIZE (PAGE_SIZE * PAGE_NUMBER)
 #define MEMORY_SLOT 0
@@ -16,10 +18,11 @@
 // 4095 -> 0
 #define TRUNC_PG(x) ((x) & ~(ALIGN))
 
-struct memory_chunk {
-	size_t size;
-	uintptr_t host;	 // host virtual address
-	uintptr_t guest; // guest real address
+struct frame {
+	size_t pfn;
+	uint64_t host_virtual_addr;
+	uint64_t guest_physical_addr;
+	struct dlist_head list;
 };
 
 uintptr_t map_page(uint64_t vaddr);
