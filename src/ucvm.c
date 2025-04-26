@@ -1,4 +1,4 @@
-
+#define _GNU_SOURCE
 #include <argp.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 
 	struct vm vm = vm_create();
 	vm_init(&vm);
-	vm_load_program(&vm, argv);
+	vm_load_program(&vm, arguments.program_args);
 	if (arguments.debug_server != NULL) {
 		struct debug_args debug_args = { .vm = &vm };
 

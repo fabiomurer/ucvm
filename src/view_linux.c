@@ -1,5 +1,4 @@
 
-#include <stddef.h>
 #define _GNU_SOURCE
 #include <elf.h>
 #include <errno.h>
@@ -112,25 +111,24 @@ void linux_view_worker_init(char **argv)
 	exit(EXIT_FAILURE);
 }
 
-int open_proc_mem(pid_t pid) 
+int open_proc_mem(pid_t pid)
 {
 	char mem_path[PATH_MAX];
-    int memfd;
+	int memfd = -1;
 
-    
-    int path_len = snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", pid);
+	int path_len = snprintf(mem_path, sizeof(mem_path), "/proc/%d/mem", pid);
 
-    if (path_len < 0 || (size_t)path_len >= sizeof(mem_path)) {
-        return -1;
-    }
+	if (path_len < 0 || (size_t)path_len >= sizeof(mem_path)) {
+		return -1;
+	}
 
-    memfd = open(mem_path, O_RDONLY);
-    
-    if (memfd == -1) {
-        return -1;
-    }
+	memfd = open(mem_path, O_RDONLY);
 
-    return memfd;
+	if (memfd == -1) {
+		return -1;
+	}
+
+	return memfd;
 }
 
 void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
@@ -176,7 +174,7 @@ void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
 	remove_vdso(child);
 	linux_view->pid = child;
 
-	// open the memory file 
+	// open the memory file
 	linux_view->memfd = open_proc_mem(child);
 	if (linux_view->memfd < 0) {
 		PANIC("open_proc_mem");
@@ -200,73 +198,84 @@ void create_linux_view(char **argv, struct linux_view *linux_view)
 	linux_view->argv = argv;
 }
 
-
-void linux_view_get_regs(struct linux_view* view, struct user_regs_struct* regs)
+void linux_view_get_regs(struct linux_view *view, struct user_regs_struct *regs)
 {
-	if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
+	if (ptrace(PTRACE_GETREGS, view->pid, 0, regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_GETREGS)");
 	}
 }
 
-int linux_view_read_mem(struct linux_view* view, off_t src, void* dest, size_t len)
+int linux_view_read_mem(struct linux_view *view, off64_t src, void *dest, size_t len)
 {
-	ssize_t nread = pread(view->memfd, dest, len, src);
+	ssize_t nread = pread64(view->memfd, dest, len, src);
 
 	// has to read exact number of byte
-	if (nread < 0 || (size_t)nread >= len) {
+	if (nread < 0 || (size_t)nread > len) {
 		return -1;
 	}
 
 	return 0;
 }
 
-uint64_t linux_view_do_syscall(struct linux_view* view, uint64_t nr, uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
+uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t arg0, uint64_t arg1,
+			       uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {
 	struct user_regs_struct regs, saved_regs;
 
-    // 1. Get registers
-    if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
+	// 1. Get registers
+	if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_GETREGS)");
 	}
-    saved_regs = regs;
+	saved_regs = regs;
 
-    // 2. Save RIP
-    const uint64_t rip = regs.rip;
+	// 2. Save RIP
+	const uint64_t rip = regs.rip;
 
-    // 3. Write syscall instruction at RIP (2 bytes: 0x0f05, little endian)
-    uint64_t patched_ins = (uint64_t)0x0f05;
-    if (ptrace(PTRACE_POKETEXT, view->pid, rip, patched_ins) < 0) {
+	// save instruction
+	uint64_t saved_inst = 0;
+	if (ptrace(PTRACE_PEEKTEXT, view->pid, rip, saved_inst) < 0) {
+		PANIC_PERROR("ptrace(PTRACE_PEEKTEXT)");
+	}
+
+	// 3. Write syscall instruction at RIP (2 bytes: 0x0f05, little endian)
+	uint64_t patched_ins = (uint64_t)0x0f05;
+	if (ptrace(PTRACE_POKETEXT, view->pid, rip, patched_ins) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_POKETEXT)");
 	}
 
-    // 4. Setup registers for mmap syscall
-    regs.rax = nr;
-    regs.rdi = arg0;
-    regs.rsi = arg1;
-    regs.rdx = arg2;
-    regs.r10 = arg3;
-    regs.r8  = arg4;
-    regs.r9  = arg5;
+	// 4. Setup registers for mmap syscall
+	regs.rax = nr;
+	regs.rdi = arg0;
+	regs.rsi = arg1;
+	regs.rdx = arg2;
+	regs.r10 = arg3;
+	regs.r8 = arg4;
+	regs.r9 = arg5;
 
-    if (ptrace(PTRACE_SETREGS, view->pid, 0, &regs) < 0) {
+	if (ptrace(PTRACE_SETREGS, view->pid, 0, &regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SETREGS)");
 	}
 
-    // 5. Single-step to execute syscall instruction
-    if (ptrace(PTRACE_SINGLESTEP, view->pid, 0, 0) < 0) {
+	// 5. Single-step to execute syscall instruction
+	if (ptrace(PTRACE_SINGLESTEP, view->pid, 0, 0) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SINGLESTEP)");
 	}
-    waitpid(view->pid, nullptr, 0);
+	waitpid(view->pid, nullptr, 0);
 
-    // 6. Read registers to get return value
-    if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
+	// 6. Read registers to get return value
+	if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_GETREGS)");
 	}
 	uint64_t ret = regs.rax;
 
-    // 7. Restore original registers
+	// 7. Restore original registers
 	if (ptrace(PTRACE_SETREGS, view->pid, 0, &saved_regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SETREGS)");
+	}
+
+	// restore inst
+	if (ptrace(PTRACE_POKETEXT, view->pid, rip, saved_inst) < 0) {
+		PANIC_PERROR("ptrace(PTRACE_POKETEXT)");
 	}
 
 	return ret;

@@ -189,10 +189,10 @@ int add_free_pfn(size_t pfn)
 	return -1;
 }
 
-int get_free_frame(struct frame* frame)
+int get_free_frame(struct frame *frame)
 {
 	size_t pfn = 0;
-	int err = get_free_pfn( &pfn);
+	int err = get_free_pfn(&pfn);
 	if (err != 0) {
 		return err;
 	}
@@ -242,7 +242,7 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 	if (get_free_frame(&pml4t_addr) != 0) {
 		PANIC("get_free_frame");
 	}
-	struct frame mem_gdt = {0};
+	struct frame mem_gdt = { 0 };
 	if (get_free_frame(&mem_gdt) != 0) {
 		PANIC("get_free_frame");
 	}
@@ -352,7 +352,8 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 
 	// map page walk
 	for (i = 0; i < PAGE_TABLE_LEVELS; i++) {
-		uint64_t *g_a = (uint64_t *)(cur_addr.host_virtual_addr + ind[i] * sizeof(uint64_t));
+		uint64_t *g_a =
+			(uint64_t *)(cur_addr.host_virtual_addr + ind[i] * sizeof(uint64_t));
 
 		// if last level
 		if (i == PAGE_TABLE_LEVELS - 1) {
@@ -369,25 +370,24 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 #ifdef DEBUG
 			printf("Allocating level %zu\n", i);
 #endif
-		struct frame new_frame = {0};
-		if (get_free_frame(&new_frame) != 0) {
-			PANIC("get_free_frame");
-		}
+			struct frame new_frame = { 0 };
+			if (get_free_frame(&new_frame) != 0) {
+				PANIC("get_free_frame");
+			}
 			*g_a = new_frame.guest_physical_addr | PAGE_FLAGS;
 		}
 		cur_addr = jump_next_frame(*g_a);
 	}
 }
 
-
 uintptr_t map_page(uint64_t vaddr)
 {
-	struct frame frame = {0};
+	struct frame frame = { 0 };
 	int err = get_free_frame(&frame);
 	if (err != 0) {
 		PANIC("get_free_frame");
 	}
 
-	map_addr(vaddr, frame.host_virtual_addr);
+	map_addr(vaddr, frame.guest_physical_addr);
 	return frame.host_virtual_addr;
 }

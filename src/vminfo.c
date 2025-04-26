@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <asm/kvm.h>
 #include <linux/kvm.h>
 #include <stdint.h>

@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <linux/kvm.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,18 +10,34 @@
 #include "guest_inspector.h"
 #include "utils.h"
 #include "vmm.h"
+#include "vm.h"
 
-int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr)
+int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool resolve_pf)
 {
 	struct kvm_translation transl_addr;
 	transl_addr.linear_address = guest_addr;
 
+	// first try
 	if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
 		PANIC_PERROR("KVM_TRANSLATE");
 	}
 
+	// first try
 	if (transl_addr.valid == 0) {
-		return -1;
+		if (!resolve_pf) {
+			return -1;
+		}
+		//  maybe the page is not mapped
+		vm_page_fault_handler(vm, guest_addr);
+
+		// second try
+		if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
+			PANIC_PERROR("KVM_TRANSLATE");
+		}
+
+		if (transl_addr.valid == 0) {
+			return -1;
+		}
 	}
 
 	*host_addr =
@@ -54,7 +72,7 @@ int read_string_host(struct vm *vm, uint64_t guest_string_addr, char *buf, size_
 			chunk_size = next_page_boundary - current_addr;
 		}
 
-		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr) < 0) {
+		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr, true) < 0) {
 			return -1;
 		}
 
@@ -102,7 +120,7 @@ int write_string_guest(struct vm *vm, uint64_t guest_string_addr, char *buf, siz
 			chunk_size = next_page_boundary - current_addr;
 		}
 
-		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr) < 0) {
+		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr, true) < 0) {
 			return -1;
 		}
 
@@ -129,7 +147,7 @@ int write_string_guest(struct vm *vm, uint64_t guest_string_addr, char *buf, siz
 	if (!null_found && byte_written < bufsiz) {
 		uint64_t null_addr = guest_string_addr + byte_written;
 
-		if (vm_guest_to_host(vm, null_addr, (void **)&host_addr) < 0) {
+		if (vm_guest_to_host(vm, null_addr, (void **)&host_addr, true) < 0) {
 			return -1;
 		}
 
@@ -170,7 +188,7 @@ int read_buffer_host(struct vm *vm, uint64_t guest_buffer_addr, uint8_t *buf, si
 			chunk_size = next_page_boundary - current_addr;
 		}
 
-		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr) < 0) {
+		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr, true) < 0) {
 			return -1;
 		}
 
@@ -212,7 +230,7 @@ int write_buffer_guest(struct vm *vm, uint64_t guest_buffer_addr, uint8_t *buf, 
 			chunk_size = next_page_boundary - current_addr;
 		}
 
-		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr) < 0) {
+		if (vm_guest_to_host(vm, current_addr, (void **)&host_addr, true) < 0) {
 			return -1;
 		}
 

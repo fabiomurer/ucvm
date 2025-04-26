@@ -27,22 +27,6 @@
 #include "arguments.h"
 #include "guest_inspector.h"
 #include "utils.h"
-#include "vmm.h"
-
-bool is_syscall(struct vm *vm, struct kvm_regs *regs)
-{
-	uint8_t inst[2];
-	if (read_buffer_host(vm, regs->rip, inst, sizeof(inst)) < 0) {
-		PANIC("read_buffer_host");
-	}
-
-	uint64_t rip_content = inst[1] | (inst[0] << 8);
-	if (rip_content == SYSCALL_OPCODE) {
-		return true;
-	} else {
-		return false;
-	}
-}
 
 uint64_t vlinux_syscall_brk(struct linux_view *linux_view, uint64_t addr)
 {
@@ -275,7 +259,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		argument should be sizeof(*head).
 		*/
 		if (arg2 == sizeof(struct robust_list_head)) {
-			//linux_proc->robust_list_head_ptr = arg1;
+			// linux_proc->robust_list_head_ptr = arg1;
 			ret = 0;
 		} else {
 			ret = -1;

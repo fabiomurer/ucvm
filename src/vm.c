@@ -1,6 +1,4 @@
-#include <sys/user.h>
 #define _GNU_SOURCE
-#include "vm.h"
 
 #include <asm/kvm.h>
 #include <errno.h>
@@ -17,13 +15,16 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <sys/user.h>
 
+#include "vm.h"
 #include "arguments.h"
 #include "view_linux.h"
 #include "utils.h"
 #include "vminfo.h"
 #include "vmm.h"
 #include "vsyscall.h"
+#include "guest_inspector.h"
 
 #define KVM_DEVICE "/dev/kvm"
 
@@ -319,7 +320,7 @@ void clear_regs(struct kvm_regs *regs)
 	regs->rip = 0;
 }
 
-void vm_load_program(struct vm *vm, char** argv)
+void vm_load_program(struct vm *vm, char **argv)
 {
 	create_linux_view(argv, &vm->linux_view);
 
@@ -352,10 +353,26 @@ int vm_run(struct vm *vm)
 	return vm->run->exit_reason;
 }
 
-void page_fault_handler(uint64_t cr2) 
+bool is_syscall(struct vm *vm, struct kvm_regs *regs)
+{
+	uint16_t *inst = nullptr;
+
+	if (vm_guest_to_host(vm, regs->rip, (void **)&inst, false) != 0) {
+		return false;
+	}
+
+	return (bool)(*inst == (uint16_t)SYSCALL_OPCODE);
+}
+
+void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 {
 	uint64_t missing_page_addr = TRUNC_PG(cr2);
-	map_page(missing_page_addr);
+	uintptr_t guest_vaddr = map_page(missing_page_addr);
+
+	if (linux_view_read_mem(&vm->linux_view, (off64_t)missing_page_addr, (void *)guest_vaddr,
+				PAGE_SIZE) != 0) {
+		PANIC("linux_view_read_mem");
+	}
 }
 
 void vm_exit_handler(int exit_code, struct vm *vm)
@@ -393,7 +410,6 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 				PANIC_PERROR("KVM_SET_REGS");
 			}
 		} else {
-
 			struct kvm_sregs sregs;
 			if (ioctl(vm->vcpufd, KVM_GET_SREGS, &sregs) < 0) {
 				PANIC_PERROR("KVM_GET_SREGS");
@@ -401,7 +417,9 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 
 			// page fault
 			if (sregs.cr2 != 0) {
-				page_fault_handler(sregs.cr2);
+				printf("page fault addr: %p, inst: %p\n", (void *)sregs.cr2,
+				       (void *)regs.rip);
+				vm_page_fault_handler(vm, sregs.cr2);
 
 				sregs.cr2 = 0;
 				if (ioctl(vm->vcpufd, KVM_SET_SREGS, &sregs) < 0) {
@@ -414,7 +432,7 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 				vcpu_events_logs(vm);
 				vcpu_regs_log(vm);
 				exit(-1);
-			}	
+			}
 		}
 		break;
 	case KVM_EXIT_FAIL_ENTRY:
