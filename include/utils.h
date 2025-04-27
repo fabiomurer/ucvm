@@ -10,10 +10,10 @@
  * Prints an error message with file and line information and exits the program
  * @param msg The error message to print
  */
-#define PANIC(msg)                                                              \
-	do {                                                                    \
-		fprintf(stderr, "%s:%d: Error: %s\n", __FILE__, __LINE__, msg); \
-		exit(EXIT_FAILURE);                                             \
+#define PANIC(msg)                                                                    \
+	do {                                                                          \
+		(void)fprintf(stderr, "%s:%d: Error: %s\n", __FILE__, __LINE__, msg); \
+		exit(EXIT_FAILURE);                                                   \
 	} while (0)
 
 /**
@@ -21,9 +21,9 @@
  * error description
  * @param msg The error message prefix
  */
-#define PANIC_PERROR(msg)                                                          \
-	do {                                                                       \
-		fprintf(stderr, "%s:%d: Error: %s: %s\n", __FILE__, __LINE__, msg, \
-			strerror(errno));                                          \
-		exit(EXIT_FAILURE);                                                \
+#define PANIC_PERROR(msg)                                                                \
+	do {                                                                             \
+		(void)fprintf(stderr, "%s:%d: Error: %s: %s\n", __FILE__, __LINE__, msg, \
+			      strerror(errno));                                          \
+		exit(EXIT_FAILURE);                                                      \
 	} while (0)

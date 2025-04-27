@@ -355,7 +355,7 @@ int vm_run(struct vm *vm)
 
 bool is_syscall(struct vm *vm, struct kvm_regs *regs)
 {
-	uint8_t* inst = nullptr;
+	uint8_t *inst = nullptr;
 
 	if (vm_guest_to_host(vm, regs->rip, (void **)&inst, false) != 0) {
 		return false;
@@ -419,8 +419,10 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 
 			// page fault
 			if (sregs.cr2 != 0) {
+#if DEBUG
 				printf("page fault addr: %p, inst: %p\n", (void *)sregs.cr2,
 				       (void *)regs.rip);
+#endif
 				vm_page_fault_handler(vm, sregs.cr2);
 
 				sregs.cr2 = 0;

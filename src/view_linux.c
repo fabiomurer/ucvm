@@ -66,15 +66,17 @@ void remove_vdso(int pid)
 		}
 		if (val == AT_SYSINFO_EHDR) {
 			// found it, make it invalid
-			if (ptrace(PTRACE_POKEDATA, pid, pos, AT_IGNORE) == -1)
+			if (ptrace(PTRACE_POKEDATA, pid, pos, AT_IGNORE) == -1) {
 				PANIC_PERROR("ptrace(PTRACE_POKEDATA)");
+			}
 			break;
 		}
 
 		errno = 0; // clear errno
 		val = ptrace(PTRACE_PEEKDATA, pid, pos += sizeof(Elf64_auxv_t), NULL);
-		if (errno != 0)
+		if (errno != 0) {
 			PANIC_PERROR("ptrace(PTRACE_PEEKDATA)");
+		}
 	}
 }
 
@@ -87,7 +89,7 @@ void linux_view_worker_init(char **argv)
 	// check if parent died between fork and here
 	if (getppid() == 1) {
 		// Parent died too quickly
-		_exit(1);
+		PANIC("linux_view_worker is dead");
 	}
 
 	// Child process: request tracing and stop itself so the parent
@@ -96,16 +98,15 @@ void linux_view_worker_init(char **argv)
 		PANIC_PERROR("ptrace(PTRACE_TRACEME)");
 	}
 	// Stop so the parent can set options.
-	raise(SIGSTOP);
+	if (raise(SIGSTOP) < 0) {
+		PANIC_PERROR("raise");
+	}
 
 	// disable address randomization
 	if (personality(ADDR_NO_RANDOMIZE) == -1) {
 		PANIC_PERROR("personality(ADDR_NO_RANDOMIZE)");
 	}
 
-	// Replace the child process with the target program.
-	// Note: We pass argv[0] as the program and &argv[0] as its
-	// arguments.
 	execvp(argv[0], &argv[0]);
 	perror("execvp");
 	exit(EXIT_FAILURE);
@@ -166,12 +167,20 @@ void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
 		PANIC("Unexpected stop before exec event occurred.");
 	}
 
+	// Single-step: after PTRACE_EVENT_EXEC a PTRACE_SINGLESTEP (maybe) is required to step
+	// into the program. RIP does't change ater it so i assume that no assemby is runned.
+	if (ptrace(PTRACE_SINGLESTEP, child, 0, 0) < 0) {
+		PANIC_PERROR("ptrace(PTRACE_SINGLESTEP)");
+	}
+	waitpid(child, nullptr, 0);
+
 #ifdef DEBUG
 	printf("process with pid: %d is loaded and stopped\n", child);
 #endif
 
 	// disable VDSO
 	remove_vdso(child);
+
 	linux_view->pid = child;
 
 	// open the memory file
@@ -193,9 +202,6 @@ void create_linux_view(char **argv, struct linux_view *linux_view)
 		linux_view_worker_init(argv);
 	} else {
 		linux_view_manager_init(child, linux_view);
-		//first syscall fails, why???
-		//uint64_t ehe = linux_view_do_syscall(linux_view, __NR_getpid, 0, 0, 0, 0, 0, 0);
-		//printf("getpid: %ld\n", ehe);
 	}
 
 	linux_view->argv = argv;
@@ -232,19 +238,18 @@ uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t ar
 	saved_regs = regs;
 
 	// 2. Save RIP
-	const uint64_t rip = regs.rip;
+	uint64_t saved_rip = regs.rip;
 
 	// save instruction
 	errno = 0;
-	uint64_t saved_inst = ptrace(PTRACE_PEEKTEXT, view->pid, rip, 0);
+	uint64_t saved_inst = ptrace(PTRACE_PEEKTEXT, view->pid, saved_rip, 0);
 	if (errno != 0) {
 		PANIC_PERROR("ptrace(PTRACE_PEEKTEXT)");
 	}
-		
 
 	// Write syscall instruction at RIP
 	uint64_t patched_ins = (uint64_t)SYSCALL_OPCODE_REV;
-	if (ptrace(PTRACE_POKETEXT, view->pid, rip, patched_ins) < 0) {
+	if (ptrace(PTRACE_POKETEXT, view->pid, saved_rip, patched_ins) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_POKETEXT)");
 	}
 
@@ -279,7 +284,7 @@ uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t ar
 	}
 
 	// restore inst
-	if (ptrace(PTRACE_POKETEXT, view->pid, rip, saved_inst) < 0) {
+	if (ptrace(PTRACE_POKETEXT, view->pid, saved_rip, saved_inst) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_POKETEXT)");
 	}
 
