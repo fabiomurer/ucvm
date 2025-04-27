@@ -355,13 +355,15 @@ int vm_run(struct vm *vm)
 
 bool is_syscall(struct vm *vm, struct kvm_regs *regs)
 {
-	uint16_t *inst = nullptr;
+	uint8_t* inst = nullptr;
 
 	if (vm_guest_to_host(vm, regs->rip, (void **)&inst, false) != 0) {
 		return false;
 	}
 
-	return (bool)(*inst == (uint16_t)SYSCALL_OPCODE);
+	uint16_t rip_content = inst[1] | (inst[0] << 8);
+
+	return (bool)(rip_content == (uint16_t)SYSCALL_OPCODE);
 }
 
 void vm_page_fault_handler(struct vm *vm, uint64_t cr2)

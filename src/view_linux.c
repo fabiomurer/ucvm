@@ -1,4 +1,4 @@
-
+#include <asm/unistd_64.h>
 #define _GNU_SOURCE
 #include <elf.h>
 #include <errno.h>
@@ -23,7 +23,7 @@
 
 #include "utils.h"
 #include "view_linux.h"
-#include "syscall.h"
+#include "vsyscall.h"
 
 // https://github.com/danteu/novdso
 void remove_vdso(int pid)
@@ -193,6 +193,9 @@ void create_linux_view(char **argv, struct linux_view *linux_view)
 		linux_view_worker_init(argv);
 	} else {
 		linux_view_manager_init(child, linux_view);
+		//first syscall fails, why???
+		//uint64_t ehe = linux_view_do_syscall(linux_view, __NR_getpid, 0, 0, 0, 0, 0, 0);
+		//printf("getpid: %ld\n", ehe);
 	}
 
 	linux_view->argv = argv;
@@ -220,9 +223,9 @@ int linux_view_read_mem(struct linux_view *view, off64_t src, void *dest, size_t
 uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t arg0, uint64_t arg1,
 			       uint64_t arg2, uint64_t arg3, uint64_t arg4, uint64_t arg5)
 {
-	struct user_regs_struct regs, saved_regs;
+	struct user_regs_struct regs;
+	struct user_regs_struct saved_regs;
 
-	// 1. Get registers
 	if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_GETREGS)");
 	}
@@ -232,18 +235,20 @@ uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t ar
 	const uint64_t rip = regs.rip;
 
 	// save instruction
-	uint64_t saved_inst = 0;
-	if (ptrace(PTRACE_PEEKTEXT, view->pid, rip, saved_inst) < 0) {
+	errno = 0;
+	uint64_t saved_inst = ptrace(PTRACE_PEEKTEXT, view->pid, rip, 0);
+	if (errno != 0) {
 		PANIC_PERROR("ptrace(PTRACE_PEEKTEXT)");
 	}
+		
 
-	// 3. Write syscall instruction at RIP (2 bytes: 0x0f05, little endian)
-	uint64_t patched_ins = (uint64_t)0x0f05;
+	// Write syscall instruction at RIP
+	uint64_t patched_ins = (uint64_t)SYSCALL_OPCODE_REV;
 	if (ptrace(PTRACE_POKETEXT, view->pid, rip, patched_ins) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_POKETEXT)");
 	}
 
-	// 4. Setup registers for mmap syscall
+	// set syscall arguments
 	regs.rax = nr;
 	regs.rdi = arg0;
 	regs.rsi = arg1;
@@ -256,19 +261,19 @@ uint64_t linux_view_do_syscall(struct linux_view *view, uint64_t nr, uint64_t ar
 		PANIC_PERROR("ptrace(PTRACE_SETREGS)");
 	}
 
-	// 5. Single-step to execute syscall instruction
+	// Single-step to execute syscall instruction
 	if (ptrace(PTRACE_SINGLESTEP, view->pid, 0, 0) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SINGLESTEP)");
 	}
 	waitpid(view->pid, nullptr, 0);
 
-	// 6. Read registers to get return value
+	// Read registers to get return value
 	if (ptrace(PTRACE_GETREGS, view->pid, 0, &regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_GETREGS)");
 	}
 	uint64_t ret = regs.rax;
 
-	// 7. Restore original registers
+	// Restore original registers
 	if (ptrace(PTRACE_SETREGS, view->pid, 0, &saved_regs) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SETREGS)");
 	}
