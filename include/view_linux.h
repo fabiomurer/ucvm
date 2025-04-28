@@ -2,7 +2,6 @@
 
 #define _GNU_SOURCE
 
-#include <fcntl.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/user.h>

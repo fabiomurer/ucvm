@@ -1,8 +1,6 @@
 #pragma once
 
-#include <asm/kvm.h>
 #include <linux/kvm.h>
-#include <stddef.h>
 #include <stdint.h>
 
 #include "gdbstub.h"

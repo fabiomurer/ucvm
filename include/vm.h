@@ -1,7 +1,6 @@
 #pragma once
 
 #include <linux/kvm.h>
-#include <stdbool.h>
 
 #include "view_linux.h"
 

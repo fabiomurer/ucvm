@@ -1,14 +1,7 @@
-#include <linux/const.h>
 #include <linux/kvm.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <string.h>
-
 #include "vmm.h"
 #include "utils.h"
-#include "intrusive_dlist.h"
 
 static void *guest_memory;
 static struct frame pml4t_addr;

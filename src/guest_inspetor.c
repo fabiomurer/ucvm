@@ -1,16 +1,11 @@
 #define _GNU_SOURCE
 
-#include <linux/kvm.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 
 #include "guest_inspector.h"
 #include "utils.h"
 #include "vmm.h"
-#include "vm.h"
 
 int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool resolve_pf)
 {

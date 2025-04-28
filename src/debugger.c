@@ -1,20 +1,11 @@
 #define _GNU_SOURCE
 
-#include <assert.h>
-#include <errno.h>
-#include <linux/kvm.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 
 #include "guest_inspector.h"
 #include "debugger.h"
 #include "utils.h"
-#include "vm.h"
 
 uint8_t break_instr = 0xcc;
 

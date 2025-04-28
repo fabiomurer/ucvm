@@ -1,8 +1,5 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdbool.h>
-
 // Intrusive doubly linked list node
 struct dlist_head {
 	struct dlist_head *next, *prev;

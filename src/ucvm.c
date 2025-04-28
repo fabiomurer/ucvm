@@ -1,12 +1,9 @@
 #define _GNU_SOURCE
 #include <argp.h>
-#include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "arguments.h"
-#include "view_linux.h"
 #include "debugger.h"
 #include "vm.h"
 

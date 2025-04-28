@@ -1,25 +1,14 @@
-#include <asm/unistd_64.h>
 #define _GNU_SOURCE
 #include <elf.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <linux/limits.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/personality.h>
 #include <sys/ptrace.h>
 #include <sys/reg.h>
-#include <sys/signal.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/user.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #include <sys/prctl.h>
-#include <signal.h>
+#include <fcntl.h>
 
 #include "utils.h"
 #include "view_linux.h"

@@ -1,26 +1,17 @@
-#include "vm.h"
 #define _GNU_SOURCE
+
 #include <asm/kvm.h>
 #include <asm/prctl.h>
-#include <asm/unistd_64.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <linux/futex.h>
 #include <linux/kvm.h>
 #include <linux/limits.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/ioctl.h>
 #include <sys/random.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include "arguments.h"
 #include "guest_inspector.h"

@@ -6,6 +6,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #include "vm.h"
 #include "arguments.h"

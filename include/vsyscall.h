@@ -2,12 +2,6 @@
 
 #define _GNU_SOURCE
 
-#include <linux/kvm.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <sys/types.h>
-
-#include "view_linux.h"
 #include "vm.h"
 
 #define SYSCALL_OPCODE 0x0F05

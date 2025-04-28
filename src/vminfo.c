@@ -1,15 +1,9 @@
 #define _GNU_SOURCE
-#include <asm/kvm.h>
-#include <linux/kvm.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 
 #include "guest_inspector.h"
 #include "utils.h"
-#include "vsyscall.h"
 
 // https://www.sandpile.org/x86/except.htm
 char exceptions_names[][30] = { "divide error",
