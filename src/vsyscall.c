@@ -1,7 +1,5 @@
-#include "view_linux.h"
+#include "vm.h"
 #define _GNU_SOURCE
-#include "vsyscall.h"
-
 #include <asm/kvm.h>
 #include <asm/prctl.h>
 #include <asm/unistd_64.h>
@@ -27,6 +25,8 @@
 #include "arguments.h"
 #include "guest_inspector.h"
 #include "utils.h"
+#include "view_linux.h"
+#include "vsyscall.h"
 
 uint64_t vlinux_syscall_brk(struct linux_view *linux_view, uint64_t addr)
 {
@@ -42,19 +42,15 @@ uint64_t vlinux_syscall_brk(struct linux_view *linux_view, uint64_t addr)
 uint64_t vlinux_syscall_arch_prctl(struct vm *vm, uint64_t op, uint64_t addr)
 {
 	uint64_t ret = -1;
-	struct kvm_sregs2 sregs;
+
 	switch (op) {
 	case ARCH_SET_FS:
-		if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
-			PANIC_PERROR("KVM_GET_SREGS2");
-		}
+		struct kvm_sregs *sregs = vm_get_sregs(vm);
 
 		// set the base address of fs register to addr
-		sregs.fs.base = addr;
+		sregs->fs.base = addr;
 
-		if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
-			PANIC_PERROR("KVM_SET_SREGS2");
-		}
+		vm_set_sregs(vm);
 		return 0;
 	default:
 		PANIC("vlinux_syscall_arch_prctl OP NOT SUPPORTED");

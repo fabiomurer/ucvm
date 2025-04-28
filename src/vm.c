@@ -1,21 +1,11 @@
 #define _GNU_SOURCE
 
-#include <asm/kvm.h>
-#include <errno.h>
-#include <error.h>
-#include <fcntl.h>
 #include <linux/kvm.h>
 #include <sched.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
-#include <unistd.h>
-#include <sys/user.h>
 
 #include "vm.h"
 #include "arguments.h"
@@ -27,6 +17,45 @@
 #include "guest_inspector.h"
 
 #define KVM_DEVICE "/dev/kvm"
+
+void vm_run_enable_sync_regs(struct vm *vm)
+{
+	// For x86, the ‘kvm_valid_regs’ field of struct kvm_run is overloaded to
+	// function as an input bit-array field set by userspace to indicate the
+	// specific register sets to be copied out on the next exit.
+	vm->run->kvm_valid_regs = KVM_SYNC_X86_VALID_FIELDS;
+}
+
+struct kvm_regs *vm_get_regs(struct vm *vm)
+{
+	if ((vm->run->kvm_valid_regs & KVM_SYNC_X86_REGS) == 0) {
+		PANIC("REGS not valid");
+	}
+
+	return &vm->run->s.regs.regs;
+}
+
+struct kvm_sregs *vm_get_sregs(struct vm *vm)
+{
+	if ((vm->run->kvm_valid_regs & KVM_SYNC_X86_SREGS) == 0) {
+		PANIC("REGS not valid");
+	}
+
+	return &vm->run->s.regs.sregs;
+}
+
+void vm_set_regs(struct vm *vm)
+{
+	// To indicate when userspace has modified values that should be copied into
+	// the vCPU, the all architecture bitarray field, ‘kvm_dirty_regs’ must be set.
+	// This is done using the same bitflags as for the ‘kvm_valid_regs’ field.
+	vm->run->kvm_dirty_regs |= KVM_SYNC_X86_REGS;
+}
+
+void vm_set_sregs(struct vm *vm)
+{
+	vm->run->kvm_dirty_regs |= KVM_SYNC_X86_SREGS;
+}
 
 struct vm vm_create(void)
 {
@@ -351,6 +380,7 @@ void vm_load_program(struct vm *vm, char **argv)
 
 int vm_run(struct vm *vm)
 {
+	vm_run_enable_sync_regs(vm);
 	if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
 		PANIC_PERROR("KVM_RUN");
 	}
@@ -400,40 +430,31 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 		break;
 
 	case KVM_EXIT_SHUTDOWN:
-		struct kvm_regs regs;
-		if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
-			PANIC_PERROR("KVM_GET_REGS");
-		}
-		if (is_syscall(vm, &regs)) {
-			if (syscall_handler(vm, &regs) == ENOSYS) {
+		struct kvm_regs *regs = vm_get_regs(vm);
+
+		if (is_syscall(vm, regs)) {
+			if (syscall_handler(vm, regs) == ENOSYS) {
 				vcpu_events_logs(vm);
 				vcpu_regs_log(vm);
 				exit(-1);
 			}
 
 			// skip syscall instruction
-			regs.rip += SYSCALL_OP_SIZE;
-			if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
-				PANIC_PERROR("KVM_SET_REGS");
-			}
+			regs->rip += SYSCALL_OP_SIZE;
+			vm_set_regs(vm);
 		} else {
-			struct kvm_sregs sregs;
-			if (ioctl(vm->vcpufd, KVM_GET_SREGS, &sregs) < 0) {
-				PANIC_PERROR("KVM_GET_SREGS");
-			}
+			struct kvm_sregs *sregs = vm_get_sregs(vm);
 
 			// page fault
-			if (sregs.cr2 != 0) {
+			if (sregs->cr2 != 0) {
 #if DEBUG
-				printf("page fault addr: %p, inst: %p\n", (void *)sregs.cr2,
-				       (void *)regs.rip);
+				printf("page fault addr: %p, inst: %p\n", (void *)sregs->cr2,
+				       (void *)regs->rip);
 #endif
-				vm_page_fault_handler(vm, sregs.cr2);
+				vm_page_fault_handler(vm, sregs->cr2);
 
-				sregs.cr2 = 0;
-				if (ioctl(vm->vcpufd, KVM_SET_SREGS, &sregs) < 0) {
-					PANIC_PERROR("KVM_SET_SREGS");
-				}
+				sregs->cr2 = 0;
+				vm_set_sregs(vm);
 			}
 
 			else {
@@ -447,9 +468,11 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 	case KVM_EXIT_FAIL_ENTRY:
 		printf("KVM_EXIT_FAIL_ENTRY: 0x%lx\n",
 		       (uint64_t)vm->run->fail_entry.hardware_entry_failure_reason);
+		exit(-1);
 		break;
 	case KVM_EXIT_INTERNAL_ERROR:
 		printf("KVM_EXIT_INTERNAL_ERROR: suberror = 0x%x\n", vm->run->internal.suberror);
+		exit(-1);
 		break;
 	default:
 		printf("Odd exit reason: %d\n", vm->run->exit_reason);

@@ -33,3 +33,11 @@ void vm_set_debug(struct vm *vm, bool enable_debug);
 void vm_set_debug_step(struct vm *vm, bool enable_step);
 
 void vm_page_fault_handler(struct vm *vm, uint64_t cr2);
+
+struct kvm_regs *vm_get_regs(struct vm *vm);
+
+struct kvm_sregs *vm_get_sregs(struct vm *vm);
+
+void vm_set_regs(struct vm *vm);
+
+void vm_set_sregs(struct vm *vm);
