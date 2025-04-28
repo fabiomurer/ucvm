@@ -46,6 +46,11 @@ struct vm vm_create(void)
 		PANIC("KVM API version not supported");
 	}
 
+	int supported_sync_regs = ioctl(vm.kvmfd, KVM_CHECK_EXTENSION, KVM_CAP_SYNC_REGS);
+	if (supported_sync_regs != KVM_SYNC_X86_VALID_FIELDS) {
+		PANIC("KVM_CAP_SYNC_REGS not supported");
+	}
+
 	// create a vm
 	if ((vm.vmfd = ioctl(vm.kvmfd, KVM_CREATE_VM, 0)) < 0) {
 		PANIC_PERROR("KVM_CREATE_VM");
