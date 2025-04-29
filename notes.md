@@ -18,10 +18,10 @@ strace -n ../ucvm/tests/hello-glibc-dyn
 [  21] access("/etc/ld.so.preload", R_OK) = -1 ENOENT (No such file or directory)
 [ 257] openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
 [   5] fstat(3, {st_mode=S_IFREG|0644, st_size=116634, ...}) = 0
-[   9] mmap(NULL, 116634, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f209475d000
+[   9] mmap(NULL, 116634, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f209475d000 
 [   3] close(3)                         = 0
 [ 257] openat(AT_FDCWD, "/lib/x86_64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
-[   0] read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0p\236\2\0\0\0\0\0"..., 832) = 832
+[   0] read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0p\236\2\0\0\0\0\0"..., 832) = 832 #
 [  17] pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840
 [   5] fstat(3, {st_mode=S_IFREG|0755, st_size=2003408, ...}) = 0
 [  17] pread64(3, "\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0"..., 840, 64) = 840

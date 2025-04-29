@@ -8,6 +8,8 @@
 #include <sys/reg.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/mman.h>
+#include <syscall.h>
 #include <fcntl.h>
 
 #include "utils.h"
@@ -112,7 +114,7 @@ int open_proc_mem(pid_t pid)
 		return -1;
 	}
 
-	memfd = open(mem_path, O_RDONLY);
+	memfd = open(mem_path, O_RDWR);
 
 	if (memfd == -1) {
 		return -1;
@@ -208,7 +210,45 @@ int linux_view_read_mem(struct linux_view *view, off64_t src, void *dest, size_t
 	ssize_t nread = pread64(view->memfd, dest, len, src);
 
 	// has to read exact number of byte
-	if (nread < 0 || (size_t)nread > len) {
+	if ((size_t)nread != len) {
+		return -1;
+	}
+
+	return 0;
+}
+
+off64_t linux_view_alloc_mem(struct linux_view *view, size_t size)
+{
+	uint64_t ret = linux_view_do_syscall(view, __NR_mmap,
+					     0, // null
+					     size, PROT_READ | PROT_WRITE,
+					     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+	if ((void *)ret == MAP_FAILED) {
+		PANIC("linux_view_do_syscall(__NR_mmap)");
+	}
+
+	return (off64_t)ret;
+}
+
+void linux_view_free_mem(struct linux_view *view, off64_t addr, size_t size)
+{
+	uint64_t ret = linux_view_do_syscall(view, __NR_munmap, addr, size, 0, 0, 0, 0);
+
+	if (ret == (uint64_t)-1) {
+		PANIC("linux_view_do_syscall(__NR_munmap)");
+	}
+}
+
+int linux_view_write_mem(struct linux_view *view, off64_t dest, const void *src, size_t len)
+{
+	if (len == 0) {
+		return 0;
+	}
+
+	ssize_t nwritten = pwrite64(view->memfd, src, len, dest);
+
+	if (nwritten != (ssize_t)len) {
 		return -1;
 	}
 

@@ -27,3 +27,5 @@
 			      strerror(errno));                                          \
 		exit(EXIT_FAILURE);                                                      \
 	} while (0)
+
+char *get_path_from_fd(int fd);
