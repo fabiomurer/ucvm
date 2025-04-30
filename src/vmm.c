@@ -1,7 +1,9 @@
 #include <linux/kvm.h>
+#include <stddef.h>
 #include <stdio.h>
 #include "vmm.h"
 #include "utils.h"
+#include <sys/user.h>
 
 static void *guest_memory;
 static struct frame pml4t_addr;
@@ -139,6 +141,11 @@ static struct kvm_segment seg_from_desc(struct seg_desc e, uint32_t idx)
 static struct frame frames_pool[PAGE_NUMBER] = { 0 };
 
 static DLIST_HEAD(free_frames_list);
+
+size_t guest_physical_addr_to_pfn(uint64_t guest_physical_addr)
+{
+	return (guest_physical_addr - GUEST_PHYS_ADDR) / PAGE_SIZE;
+}
 
 void free_frames_list_init(void)
 {
@@ -383,4 +390,85 @@ uintptr_t map_page(uint64_t vaddr)
 
 	map_addr(vaddr, frame.guest_physical_addr);
 	return frame.host_virtual_addr;
+}
+
+int unmap_addr(uint64_t vaddr)
+{
+	if (vaddr % PAGE_SIZE != 0) {
+		PANIC("ALIGMENT PROBLEMS");
+	}
+
+	struct frame cur_addr = pml4t_addr; // Start walk from PML4
+	uint64_t *entry_ptr = nullptr;
+
+	const uint64_t indices[PAGE_TABLE_LEVELS] = {
+		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
+		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
+		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
+		(vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3,
+	};
+
+	// Walk the page tables
+	for (int i = 0; i < PAGE_TABLE_LEVELS; i++) {
+		// Calculate the host virtual address of the entry in the current table
+		entry_ptr =
+			(uint64_t *)(cur_addr.host_virtual_addr + (indices[i] * sizeof(uint64_t)));
+
+		// Check if the entry is present
+		if (!(*entry_ptr & PAGE_PRESENT)) {
+			return -1; // Indicate page was not mapped
+		}
+
+		// If this is the PTE level (last level)
+		if (i == PAGE_TABLE_LEVELS - 1) {
+			// Found the PTE. Clear it to unmap the page.
+			uint64_t phys_addr = *entry_ptr & ~(_AC(PAGE_SIZE - 1, ULL));
+
+#if DEBUG
+			printf("Unmapping vaddr: %lx phys_addr:%lx\n", vaddr, phys_addr);
+#endif
+
+			// free used frame
+			size_t pfn = guest_physical_addr_to_pfn(phys_addr);
+			add_free_pfn(pfn);
+
+			// unset it
+			*entry_ptr = 0;
+
+			return 0; // Successfully unmapped
+		}
+
+		// If not the last level, move to the next level table
+		cur_addr = jump_next_frame(*entry_ptr); // *entry_ptr contains the guest physical
+							// addr of the next table
+	}
+
+	// Should not be reached if PAGE_TABLE_LEVELS > 0
+	return -1;
+}
+
+// TODO: make more performant by unmapping only the mapped pages
+void unmap_range(uint64_t vaddr_start, size_t size)
+{
+	if (size == 0) {
+		return;
+	}
+
+	// Align start address down to page boundary
+	uint64_t vaddr = TRUNC_PG(vaddr_start);
+
+	// Calculate end address (exclusive). Align up to the *next* page boundary
+	uint64_t vaddr_last_byte = vaddr_start + size - 1;
+	uint64_t vaddr_end = ROUND_PG(vaddr_last_byte);
+
+	// Iterate through pages in the range
+	while (vaddr < vaddr_end) {
+		unmap_addr(vaddr); // can fail
+		vaddr += PAGE_SIZE;
+	}
+
+	// there is no need to invalidate the TLB (tlb flush)
+	// because this is done when the vm is stopped (exited)
+	// when a vm enter is perform all the addresses of the
+	// guest are invalidated.
 }

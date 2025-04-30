@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "view_linux.h"
 #include "vsyscall.h"
+#include "vmm.h"
 
 uint64_t vlinux_syscall_mmap(struct linux_view *linux_view, void *addr, size_t lenght, int prot,
 			     int flags, int fd, off_t offset)
@@ -193,11 +194,17 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		HANDLE_SYSCALL(__NR_mprotect)
 		break;
 
-		HANDLE_SYSCALL(__NR_munmap) {
+		HANDLE_SYSCALL(__NR_munmap)
+		{
 			uint64_t addr = arg1;
 			uint64_t len = arg2;
-			ret = linux_view_do_syscall(&vm->linux_view, __NR_munmap, addr, len, 0, 0, 0, 0);
-			// TODO: unmap fom guest and tlb flush?
+			ret = linux_view_do_syscall(&vm->linux_view, __NR_munmap, addr, len, 0, 0,
+						    0, 0);
+
+			// unmap in the guest
+			if (ret == 0) { // successful unmap
+				unmap_range(addr, len);
+			}
 		}
 		break;
 
@@ -205,7 +212,8 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		ret = vlinux_syscall_brk(&vm->linux_view, arg1);
 		break;
 
-		HANDLE_SYSCALL(__NR_pread64) {
+		HANDLE_SYSCALL(__NR_pread64)
+		{
 			int fd = (int)arg1;
 			uint64_t buf = arg2;
 			size_t count = arg3;

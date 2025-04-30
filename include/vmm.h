@@ -27,4 +27,8 @@ struct frame {
 
 uintptr_t map_page(uint64_t vaddr);
 
+int unmap_addr(uint64_t vaddr);
+
+void unmap_range(uint64_t vaddr_start, size_t size);
+
 void cpu_init_long(struct kvm_sregs2 *sregs, void *memory);
