@@ -193,8 +193,33 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		HANDLE_SYSCALL(__NR_mprotect)
 		break;
 
+		HANDLE_SYSCALL(__NR_munmap) {
+			uint64_t addr = arg1;
+			uint64_t len = arg2;
+			ret = linux_view_do_syscall(&vm->linux_view, __NR_munmap, addr, len, 0, 0, 0, 0);
+			// TODO: unmap fom guest and tlb flush?
+		}
+		break;
+
 		HANDLE_SYSCALL(__NR_brk)
 		ret = vlinux_syscall_brk(&vm->linux_view, arg1);
+		break;
+
+		HANDLE_SYSCALL(__NR_pread64) {
+			int fd = (int)arg1;
+			uint64_t buf = arg2;
+			size_t count = arg3;
+			off_t offset = arg4;
+
+			uint8_t *tmp_buff = malloc(count);
+
+			ret = syscall(__NR_pread64, fd, tmp_buff, count, offset);
+
+			if (write_buffer_guest(vm, buf, tmp_buff, count) < 0) {
+				PANIC("write_buffer_guest");
+			}
+			free(tmp_buff);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_access)
