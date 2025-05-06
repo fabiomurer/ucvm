@@ -25,6 +25,8 @@ struct frame {
 	struct dlist_head list;
 };
 
+void* host_virtual_addr_to_guest_physical_addr(uint64_t vaddr);
+
 uintptr_t map_page(uint64_t vaddr);
 
 int unmap_addr(uint64_t vaddr);

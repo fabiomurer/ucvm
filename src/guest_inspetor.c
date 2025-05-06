@@ -9,16 +9,10 @@
 
 int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool resolve_pf)
 {
-	struct kvm_translation transl_addr;
-	transl_addr.linear_address = guest_addr;
+	*host_addr = host_virtual_addr_to_guest_physical_addr(guest_addr);
 
 	// first try
-	if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
-		PANIC_PERROR("KVM_TRANSLATE");
-	}
-
-	// first try
-	if (transl_addr.valid == 0) {
+	if (*host_addr == nullptr) {
 		if (!resolve_pf) {
 			return -1;
 		}
@@ -26,17 +20,13 @@ int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool
 		vm_page_fault_handler(vm, guest_addr);
 
 		// second try
-		if (ioctl(vm->vcpufd, KVM_TRANSLATE, &transl_addr) < 0) {
-			PANIC_PERROR("KVM_TRANSLATE");
-		}
+		*host_addr = host_virtual_addr_to_guest_physical_addr(guest_addr);
 
-		if (transl_addr.valid == 0) {
+		if (*host_addr == nullptr) {
 			return -1;
 		}
 	}
-
-	*host_addr =
-		(void *)((uint64_t)vm->memory + transl_addr.physical_address - GUEST_PHYS_ADDR);
+	
 	return 0;
 }
 

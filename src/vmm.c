@@ -203,6 +203,17 @@ int get_free_frame(struct frame *frame)
 	return 0;
 }
 
+struct frame* get_frame_from_phyis_addr(uint64_t phyis_addr)
+{
+	size_t pfn = phyis_addr / PAGE_SIZE;
+
+	if (pfn >= PAGE_NUMBER) {
+		PANIC("pfn too large");
+	}
+
+	return &frames_pool[pfn];
+}
+
 #define CRO_PROTECTED_MODE (1ULL << 0)
 #define CR0_ENABLE_PAGING (1ULL << 31)
 #define CR4_ENABLE_PAE (1ULL << 5)
@@ -327,6 +338,138 @@ struct frame jump_next_frame(uint64_t gaddr)
 	};
 
 	return frame;
+}
+
+
+/*
+linear address (virtual)
+9 PGD 9 PDU 9 PMD 9 PT 12 offset
+
+NOTE:
+*** Physical Address is is considering the pfn (
+real pyhisical address *= PAGE_SIZE ()
+)
+
+
+https://blog.zolutal.io/understanding-paging/
+
+~ PGD Entry ~                                                   Present ──────┐
+                                                            Read/Write ──────┐|
+                                                      User/Supervisor ──────┐||
+                                                  Page Write Through ──────┐|||
+                                               Page Cache Disabled ──────┐ ||||
+                                                         Accessed ──────┐| ||||
+                                                         Ignored ──────┐|| ||||
+                                                       Reserved ──────┐||| ||||
+┌─ NX          ┌─ Reserved                             Ignored ──┬──┐ |||| ||||
+|┌───────────┐ |┌──────────────────────────────────────────────┐ |  | |||| ||||
+||  Ignored  | ||               PUD Physical Address           | |  | |||| ||||
+||           | ||                                              | |  | |||| ||||
+XXXX XXXX XXXX 0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX 0XXX XXXX
+       56        48        40        32        24        16         8         0
+
+~ PUD Entry, Page Size unset ~                                  Present ──────┐
+                                                            Read/Write ──────┐|
+                                                      User/Supervisor ──────┐||
+                                                  Page Write Through ──────┐|||
+                                               Page Cache Disabled ──────┐ ||||
+                                                         Accessed ──────┐| ||||
+                                                         Ignored ──────┐|| ||||
+                                                      Page Size ──────┐||| ||||
+┌─ NX          ┌─ Reserved                             Ignored ──┬──┐ |||| ||||
+|┌───────────┐ |┌──────────────────────────────────────────────┐ |  | |||| ||||
+||  Ignored  | ||               PMD Physical Address           | |  | |||| ||||
+||           | ||                                              | |  | |||| ||||
+XXXX XXXX XXXX 0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX 0XXX XXXX
+       56        48        40        32        24        16         8         0
+
+~ PMD Entry, Page Size unset ~                                  Present ──────┐
+                                                            Read/Write ──────┐|
+                                                      User/Supervisor ──────┐||
+                                                  Page Write Through ──────┐|||
+                                               Page Cache Disabled ──────┐ ||||
+                                                         Accessed ──────┐| ||||
+                                                         Ignored ──────┐|| ||||
+                                                      Page Size ──────┐||| ||||
+┌─ NX          ┌─ Reserved                             Ignored ──┬──┐ |||| ||||
+|┌───────────┐ |┌──────────────────────────────────────────────┐ |  | |||| ||||
+||  Ignored  | ||                PT Physical Address           | |  | |||| ||||
+||           | ||                                              | |  | |||| ||||
+XXXX XXXX XXXX 0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX 0XXX XXXX
+       56        48        40        32        24        16         8         0
+
+~ PT Entry ~                                                    Present ──────┐
+                                                            Read/Write ──────┐|
+                                                      User/Supervisor ──────┐||
+                                                  Page Write Through ──────┐|||
+                                               Page Cache Disabled ──────┐ ||||
+                                                         Accessed ──────┐| ||||
+┌─── NX                                                    Dirty ──────┐|| ||||
+|┌───┬─ Memory Protection Key              Page Attribute Table ──────┐||| ||||
+||   |┌──────┬─── Ignored                               Global ─────┐ |||| ||||
+||   ||      | ┌─── Reserved                          Ignored ───┬─┐| |||| ||||
+||   ||      | |┌──────────────────────────────────────────────┐ | || |||| ||||
+||   ||      | ||            4KB Page Physical Address         | | || |||| ||||
+||   ||      | ||                                              | | || |||| ||||
+XXXX XXXX XXXX 0XXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+       56        48        40        32        24        16         8         0
+*/
+
+
+void get_indexes_array(uint64_t vaddr, uint64_t* indexes_array)
+{
+	
+	indexes_array[0] = (vaddr & _AC(0xFF8000000000, ULL)) >> SHIFT_LVL_0;
+	indexes_array[1] = (vaddr & _AC(0x7FC0000000, ULL)) >> SHIFT_LVL_1;
+	indexes_array[2] = (vaddr & _AC(0x3FE00000, ULL)) >> SHIFT_LVL_2;
+	indexes_array[3] = (vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3;
+}
+
+#define PHYIS_ADDR_MASK 0x7FFFFFFFFF000
+
+uint64_t get_phyis_addr_from_pt_row(uint64_t pt_row)
+{
+	return (pt_row & PHYIS_ADDR_MASK);
+}
+
+#define NULL_PT_ROW 0
+
+void* host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
+{
+	uint64_t offset = vaddr % PAGE_SIZE;
+
+	uint64_t indexes_array[PAGE_TABLE_LEVELS] = {0};
+
+	get_indexes_array(vaddr, indexes_array);
+
+	struct frame* current_pt_table = &pml4t_addr; // 512 entries
+	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
+		
+		uint64_t current_pt_row = *(uint64_t *)(
+			current_pt_table->host_virtual_addr + (indexes_array[level] * sizeof(uint64_t))
+		);
+		uint64_t phyis_addr = get_phyis_addr_from_pt_row(current_pt_row);
+
+		// if last level
+		if (level == PAGE_TABLE_LEVELS - 1) {
+			// not present
+			if ((current_pt_row & PAGE_PRESENT) == 0) {
+				return nullptr;
+			}
+			struct frame *f = get_frame_from_phyis_addr(phyis_addr);
+			return (void*)(f->host_virtual_addr + offset);
+		}
+
+		// not allocated
+		if (current_pt_row == NULL_PT_ROW) {
+			return nullptr;
+		}
+
+		// jump to next page table
+		current_pt_table = get_frame_from_phyis_addr(phyis_addr);
+	}
+
+	return nullptr;
 }
 
 // set 4 level page table for address translation
