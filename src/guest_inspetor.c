@@ -26,7 +26,7 @@ int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool
 			return -1;
 		}
 	}
-	
+
 	return 0;
 }
 

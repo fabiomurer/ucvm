@@ -24,7 +24,7 @@ void vm_run_enable_sync_regs(struct vm *vm)
 	// For x86, the ‘kvm_valid_regs’ field of struct kvm_run is overloaded to
 	// function as an input bit-array field set by userspace to indicate the
 	// specific register sets to be copied out on the next exit.
-	vm->run->kvm_valid_regs = KVM_SYNC_X86_VALID_FIELDS;
+	vm->run->kvm_valid_regs = KVM_SYNC_X86_REGS | KVM_SYNC_X86_SREGS;
 }
 
 struct kvm_regs *vm_get_regs(struct vm *vm)
@@ -432,8 +432,19 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 
 	case KVM_EXIT_SHUTDOWN:
 		struct kvm_regs *regs = vm_get_regs(vm);
+		struct kvm_sregs *sregs = vm_get_sregs(vm);
 
-		if (is_syscall(vm, regs)) {
+		// page fault
+		if (sregs->cr2 != 0) {
+#if DEBUG
+			printf("page fault addr: %p, inst: %p\n", (void *)sregs->cr2,
+			       (void *)regs->rip);
+#endif
+			vm_page_fault_handler(vm, sregs->cr2);
+
+			sregs->cr2 = 0;
+			vm_set_sregs(vm);
+		} else if (is_syscall(vm, regs)) {
 			if (syscall_handler(vm, regs) == ENOSYS) {
 				vcpu_events_logs(vm);
 				vcpu_regs_log(vm);
@@ -444,26 +455,10 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 			regs->rip += SYSCALL_OP_SIZE;
 			vm_set_regs(vm);
 		} else {
-			struct kvm_sregs *sregs = vm_get_sregs(vm);
-
-			// page fault
-			if (sregs->cr2 != 0) {
-#if DEBUG
-				printf("page fault addr: %p, inst: %p\n", (void *)sregs->cr2,
-				       (void *)regs->rip);
-#endif
-				vm_page_fault_handler(vm, sregs->cr2);
-
-				sregs->cr2 = 0;
-				vm_set_sregs(vm);
-			}
-
-			else {
-				printf("unespected shutdown\n");
-				vcpu_events_logs(vm);
-				vcpu_regs_log(vm);
-				exit(-1);
-			}
+			printf("unespected shutdown\n");
+			vcpu_events_logs(vm);
+			vcpu_regs_log(vm);
+			exit(-1);
 		}
 		break;
 	case KVM_EXIT_FAIL_ENTRY:
