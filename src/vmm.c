@@ -203,9 +203,9 @@ int get_free_frame(struct frame *frame)
 	return 0;
 }
 
-struct frame* get_frame_from_phyis_addr(uint64_t phyis_addr)
+struct frame* get_frame_from_phys_addr(uint64_t phys_addr)
 {
-	size_t pfn = phyis_addr / PAGE_SIZE;
+	size_t pfn = phys_addr / PAGE_SIZE;
 
 	if (pfn >= PAGE_NUMBER) {
 		PANIC("pfn too large");
@@ -427,28 +427,26 @@ void get_indexes_array(uint64_t vaddr, uint64_t* indexes_array)
 
 #define PHYIS_ADDR_MASK 0x7FFFFFFFFF000
 
-uint64_t get_phyis_addr_from_pt_row(uint64_t pt_row)
+uint64_t get_phys_addr_from_pt_row(uint64_t pt_row)
 {
 	return (pt_row & PHYIS_ADDR_MASK);
 }
 
-#define NULL_PT_ROW 0
+#define NULL_PT_ROW 0ULL
 
 void* host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
 {
 	uint64_t offset = vaddr % PAGE_SIZE;
-
 	uint64_t indexes_array[PAGE_TABLE_LEVELS] = {0};
-
 	get_indexes_array(vaddr, indexes_array);
+	struct frame* current_pt_table = &pml4t_addr;
 
-	struct frame* current_pt_table = &pml4t_addr; // 512 entries
 	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
 		
 		uint64_t current_pt_row = *(uint64_t *)(
 			current_pt_table->host_virtual_addr + (indexes_array[level] * sizeof(uint64_t))
 		);
-		uint64_t phyis_addr = get_phyis_addr_from_pt_row(current_pt_row);
+		uint64_t phys_addr = get_phys_addr_from_pt_row(current_pt_row);
 
 		// if last level
 		if (level == PAGE_TABLE_LEVELS - 1) {
@@ -456,7 +454,7 @@ void* host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
 			if ((current_pt_row & PAGE_PRESENT) == 0) {
 				return nullptr;
 			}
-			struct frame *f = get_frame_from_phyis_addr(phyis_addr);
+			struct frame *f = get_frame_from_phys_addr(phys_addr);
 			return (void*)(f->host_virtual_addr + offset);
 		}
 
@@ -466,60 +464,56 @@ void* host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
 		}
 
 		// jump to next page table
-		current_pt_table = get_frame_from_phyis_addr(phyis_addr);
+		current_pt_table = get_frame_from_phys_addr(phys_addr);
 	}
 
 	return nullptr;
 }
 
-// set 4 level page table for address translation
 void map_addr(uint64_t vaddr, uint64_t phys_addr)
 {
 #ifdef DEBUG
 	printf("Mapping %lx to %lx\n", vaddr, phys_addr);
 #endif
 
-	size_t i = 0;
-	struct frame cur_addr = pml4t_addr;
-	const uint64_t ind[PAGE_TABLE_LEVELS] = {
-		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
-		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
-		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
-		(vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3,
-	};
-
 	// if not alligned
 	if ((vaddr % PAGE_SIZE != 0) || (phys_addr % PAGE_SIZE != 0)) {
 		PANIC("ALIGMENT PROBLEMS");
 	}
 
-	// map page walk
-	for (i = 0; i < PAGE_TABLE_LEVELS; i++) {
-		uint64_t *g_a =
-			(uint64_t *)(cur_addr.host_virtual_addr + ind[i] * sizeof(uint64_t));
+	uint64_t indexes_array[PAGE_TABLE_LEVELS] = {0};
+	get_indexes_array(vaddr, indexes_array);
+	struct frame* current_pt_table = &pml4t_addr; 
+
+	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
+		
+		uint64_t* current_pt_row = (uint64_t *)(
+			current_pt_table->host_virtual_addr + (indexes_array[level] * sizeof(uint64_t))
+		);
 
 		// if last level
-		if (i == PAGE_TABLE_LEVELS - 1) {
+		if (level == PAGE_TABLE_LEVELS - 1) {
 			// is alredy mapped (not 0)
-			if (*g_a) {
+			if (*current_pt_row != NULL_PT_ROW) {
 				PANIC("PAGE ALREADY MAPPED");
 			}
 			// Last page. Just set it to the physicall address
-			*g_a = (uint64_t)phys_addr | PAGE_FLAGS;
+			*current_pt_row = (uint64_t)phys_addr | PAGE_FLAGS;
 			break;
 		}
+
 		// if the part of the current level is not mapped, map it
-		if (!*g_a) {
-#ifdef DEBUG
-			printf("Allocating level %zu\n", i);
-#endif
+		if (*current_pt_row == NULL_PT_ROW) {
 			struct frame new_frame = { 0 };
 			if (get_free_frame(&new_frame) != 0) {
 				PANIC("get_free_frame");
 			}
-			*g_a = new_frame.guest_physical_addr | PAGE_FLAGS;
+			*current_pt_row = new_frame.guest_physical_addr | PAGE_FLAGS;
 		}
-		cur_addr = jump_next_frame(*g_a);
+
+		// jump to next page table
+		uint64_t pt_row_addr = get_phys_addr_from_pt_row(*current_pt_row);
+		current_pt_table = get_frame_from_phys_addr(pt_row_addr);
 	}
 }
 
@@ -541,52 +535,42 @@ int unmap_addr(uint64_t vaddr)
 		PANIC("ALIGMENT PROBLEMS");
 	}
 
-	struct frame cur_addr = pml4t_addr; // Start walk from PML4
-	uint64_t *entry_ptr = nullptr;
+	uint64_t indexes_array[PAGE_TABLE_LEVELS] = {0};
+	get_indexes_array(vaddr, indexes_array);
+	struct frame* current_pt_table = &pml4t_addr;
 
-	const uint64_t indices[PAGE_TABLE_LEVELS] = {
-		(vaddr & _AC(0xff8000000000, ULL)) >> SHIFT_LVL_0,
-		(vaddr & _AC(0x7fc0000000, ULL)) >> SHIFT_LVL_1,
-		(vaddr & _AC(0x3fe00000, ULL)) >> SHIFT_LVL_2,
-		(vaddr & _AC(0x1FF000, ULL)) >> SHIFT_LVL_3,
-	};
-
-	// Walk the page tables
-	for (int i = 0; i < PAGE_TABLE_LEVELS; i++) {
-		// Calculate the host virtual address of the entry in the current table
-		entry_ptr =
-			(uint64_t *)(cur_addr.host_virtual_addr + (indices[i] * sizeof(uint64_t)));
+	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
+		
+		uint64_t* current_pt_row = (uint64_t *)(
+			current_pt_table->host_virtual_addr + (indexes_array[level] * sizeof(uint64_t))
+		);
+		uint64_t phys_addr = get_phys_addr_from_pt_row(*current_pt_row);
 
 		// Check if the entry is present
-		if (!(*entry_ptr & PAGE_PRESENT)) {
+		if ((*current_pt_row & PAGE_PRESENT) == 0) {
 			return -1; // Indicate page was not mapped
 		}
 
-		// If this is the PTE level (last level)
-		if (i == PAGE_TABLE_LEVELS - 1) {
+		// if last level
+		if (level == PAGE_TABLE_LEVELS - 1) {
+			
 			// Found the PTE. Clear it to unmap the page.
-			uint64_t phys_addr = *entry_ptr & ~(_AC(PAGE_SIZE - 1, ULL));
-
 #if DEBUG
 			printf("Unmapping vaddr: %lx phys_addr:%lx\n", vaddr, phys_addr);
 #endif
-
 			// free used frame
 			size_t pfn = guest_physical_addr_to_pfn(phys_addr);
 			add_free_pfn(pfn);
 
 			// unset it
-			*entry_ptr = 0;
+			*current_pt_row = NULL_PT_ROW;
 
 			return 0; // Successfully unmapped
 		}
 
-		// If not the last level, move to the next level table
-		cur_addr = jump_next_frame(*entry_ptr); // *entry_ptr contains the guest physical
-							// addr of the next table
+		// jump to next page table
+		current_pt_table = get_frame_from_phys_addr(phys_addr);
 	}
-
-	// Should not be reached if PAGE_TABLE_LEVELS > 0
 	return -1;
 }
 
