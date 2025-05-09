@@ -154,6 +154,17 @@ void cpu_init_cpuid(struct vm *vm)
 	=> disable those bits
 	*/
 	for (uint32_t i = 0; i < cpuid->nent; i++) {
+		/*
+    	function:
+    	    the eax value used to obtain the entry
+    	index:
+    	    the ecx value used to obtain the entry (for entries that are affected by ecx)
+    	flags:
+    	    an OR of zero or more of the following:
+			KVM_CPUID_FLAG_SIGNIFCANT_INDEX: if the index field is valid
+    	    eax, ebx, ecx, edx:
+    	        the values returned by the cpuid instruction for this function/index combination
+		*/
 		struct kvm_cpuid_entry2 *entry = &cpuid->entries[i];
 		if (entry->function == 1 && entry->index == 0) {
 			// clearing x2APIC bit
@@ -222,7 +233,9 @@ void cpu_init_xcrs(struct kvm_xcrs *xrcs)
 		if (xrcs->xcrs[i].xcr == 0) {
 			// avx
 			xrcs->xcrs[i].value |= XCR0_X87 | XCR0_SSE | XCR0_AVX;
-			// avx512 not supported
+			// avx512 not supported for any of my devices (cannot test it)
+			// TODO: read the cpuid bit to see if is available 
+			// 		eax value 7, exc 0, bit 16 EBX AVX512F
 			// xrcs->xcrs[i].value |= XCR0_OPMASK | ZMM_Hi256 |
 			// Hi16_ZMM;
 			break;
