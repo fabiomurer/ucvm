@@ -139,7 +139,7 @@ typedef enum microarchitecture_level {
 	x86_64_v1,
 	x86_64_v2,
 	x86_64_v3,
-	x86_64_v4, 
+	x86_64_v4,
 	x86_64_unknown
 } microarchitecture_level;
 
@@ -184,57 +184,95 @@ microarchitecture_level cpu_microarchitecture_levels(struct kvm_cpuid2 *cpuid)
 		struct kvm_cpuid_entry2 *entry = &cpuid->entries[i];
 
 		// Standard Features (Function 0x00000001)
-		// For this leaf, index (ECX input) is not typically varied for these basic feature flags.
-		if (entry->function == 0x00000001 && !(entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX)) {
-			if (entry->edx & (1U << 0))  has_fpu = true;          // EDX[0]  FPU
-			if (entry->edx & (1U << 8))  has_cx8 = true;          // EDX[8]  CMPXCHG8B
-			if (entry->edx & (1U << 15)) has_cmov = true;        // EDX[15] CMOV
-			if (entry->edx & (1U << 23)) has_mmx = true;         // EDX[23] MMX
-			if (entry->edx & (1U << 24)) has_fxsr = true;        // EDX[24] FXSAVE/FXRSTOR
-			if (entry->edx & (1U << 25)) has_sse = true;         // EDX[25] SSE
-			if (entry->edx & (1U << 26)) has_sse2 = true;        // EDX[26] SSE2
+		// For this leaf, index (ECX input) is not typically varied for these basic feature
+		// flags.
+		if (entry->function == 0x00000001 &&
+		    !(entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX)) {
+			if (entry->edx & (1U << 0))
+				has_fpu = true; // EDX[0]  FPU
+			if (entry->edx & (1U << 8))
+				has_cx8 = true; // EDX[8]  CMPXCHG8B
+			if (entry->edx & (1U << 15))
+				has_cmov = true; // EDX[15] CMOV
+			if (entry->edx & (1U << 23))
+				has_mmx = true; // EDX[23] MMX
+			if (entry->edx & (1U << 24))
+				has_fxsr = true; // EDX[24] FXSAVE/FXRSTOR
+			if (entry->edx & (1U << 25))
+				has_sse = true; // EDX[25] SSE
+			if (entry->edx & (1U << 26))
+				has_sse2 = true; // EDX[26] SSE2
 
-			if (entry->ecx & (1U << 0)) has_sse3 = true;         // ECX[0]  SSE3
-			if (entry->ecx & (1U << 9)) has_ssse3 = true;        // ECX[9]  SSSE3
-			if (entry->ecx & (1U << 12)) has_fma = true;         // ECX[12] FMA3
-			if (entry->ecx & (1U << 13)) has_cmpxchg16b = true;  // ECX[13] CMPXCHG16B
-			if (entry->ecx & (1U << 19)) has_sse4_1 = true;      // ECX[19] SSE4.1
-			if (entry->ecx & (1U << 20)) has_sse4_2 = true;      // ECX[20] SSE4.2
-			if (entry->ecx & (1U << 22)) has_movbe = true;       // ECX[22] MOVBE
-			if (entry->ecx & (1U << 23)) has_popcnt = true;      // ECX[23] POPCNT
-			if (entry->ecx & (1U << 26)) has_xsave = true;     	 // ECX[26] XSAVE
-			if (entry->ecx & (1U << 28)) has_avx = true;         // ECX[28] AVX
-			if (entry->ecx & (1U << 29)) has_f16c = true;        // ECX[29] F16C (Half-precision convert)
+			if (entry->ecx & (1U << 0))
+				has_sse3 = true; // ECX[0]  SSE3
+			if (entry->ecx & (1U << 9))
+				has_ssse3 = true; // ECX[9]  SSSE3
+			if (entry->ecx & (1U << 12))
+				has_fma = true; // ECX[12] FMA3
+			if (entry->ecx & (1U << 13))
+				has_cmpxchg16b = true; // ECX[13] CMPXCHG16B
+			if (entry->ecx & (1U << 19))
+				has_sse4_1 = true; // ECX[19] SSE4.1
+			if (entry->ecx & (1U << 20))
+				has_sse4_2 = true; // ECX[20] SSE4.2
+			if (entry->ecx & (1U << 22))
+				has_movbe = true; // ECX[22] MOVBE
+			if (entry->ecx & (1U << 23))
+				has_popcnt = true; // ECX[23] POPCNT
+			if (entry->ecx & (1U << 26))
+				has_xsave = true; // ECX[26] XSAVE
+			if (entry->ecx & (1U << 28))
+				has_avx = true; // ECX[28] AVX
+			if (entry->ecx & (1U << 29))
+				has_f16c = true; // ECX[29] F16C (Half-precision convert)
 		}
 
 		// Structured Extended Features (Function 0x00000007, Index 0)
 		// KVM_CPUID_FLAG_SIGNIFCANT_INDEX means the 'index' field was used as input ECX.
-		if (entry->function == 0x00000007 && (entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX) && entry->index == 0) {
-			if (entry->ebx & (1U << 3)) has_bmi1 = true;         // EBX[3]  BMI1
-			if (entry->ebx & (1U << 5)) has_avx2 = true;         // EBX[5]  AVX2
-			if (entry->ebx & (1U << 8)) has_bmi2 = true;         // EBX[8]  BMI2
-			if (entry->ebx & (1U << 16)) has_avx512f = true;     // EBX[16] AVX512F (Foundation)
-			if (entry->ebx & (1U << 17)) has_avx512dq = true;    // EBX[17] AVX512DQ (Double/Quadword)
-			if (entry->ebx & (1U << 28)) has_avx512cd = true;    // EBX[28] AVX512CD (Conflict Detection)
-			if (entry->ebx & (1U << 30)) has_avx512bw = true;    // EBX[30] AVX512BW (Byte/Word)
-			if (entry->ebx & (1U << 31)) has_avx512vl = true;    // EBX[31] AVX512VL (Vector Length Ext)
+		if (entry->function == 0x00000007 &&
+		    (entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX) && entry->index == 0) {
+			if (entry->ebx & (1U << 3))
+				has_bmi1 = true; // EBX[3]  BMI1
+			if (entry->ebx & (1U << 5))
+				has_avx2 = true; // EBX[5]  AVX2
+			if (entry->ebx & (1U << 8))
+				has_bmi2 = true; // EBX[8]  BMI2
+			if (entry->ebx & (1U << 16))
+				has_avx512f = true; // EBX[16] AVX512F (Foundation)
+			if (entry->ebx & (1U << 17))
+				has_avx512dq = true; // EBX[17] AVX512DQ (Double/Quadword)
+			if (entry->ebx & (1U << 28))
+				has_avx512cd = true; // EBX[28] AVX512CD (Conflict Detection)
+			if (entry->ebx & (1U << 30))
+				has_avx512bw = true; // EBX[30] AVX512BW (Byte/Word)
+			if (entry->ebx & (1U << 31))
+				has_avx512vl = true; // EBX[31] AVX512VL (Vector Length Ext)
 		}
 
 		// Extended Features (Function 0x80000001)
 		// Index is not typically varied for these flags.
-		if (entry->function == 0x80000001 && !(entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX)) {
-			if (entry->ecx & (1U << 0)) has_lahf_sahf = true;    // ECX[0] LAHF/SAHF in 64-bit mode
-			if (entry->ecx & (1U << 5)) has_lzcnt = true;        // ECX[5] LZCNT (ABM on AMD)
-			if (entry->edx & (1U << 11)) has_syscall = true;     // EDX[11] SYSCALL/SYSRET
-			// Note: CPUID.80000001h:EDX[20] is NX bit (No-Execute), not in the microarch levels list but important.
-			// Note: CPUID.80000001h:EDX[29] is Long Mode (x86-64), fundamental.
+		if (entry->function == 0x80000001 &&
+		    !(entry->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX)) {
+			if (entry->ecx & (1U << 0))
+				has_lahf_sahf = true; // ECX[0] LAHF/SAHF in 64-bit mode
+			if (entry->ecx & (1U << 5))
+				has_lzcnt = true; // ECX[5] LZCNT (ABM on AMD)
+			if (entry->edx & (1U << 11))
+				has_syscall = true; // EDX[11] SYSCALL/SYSRET
+			// Note: CPUID.80000001h:EDX[20] is NX bit (No-Execute), not in the
+			// microarch levels list but important. Note: CPUID.80000001h:EDX[29] is
+			// Long Mode (x86-64), fundamental.
 		}
 	}
 
-	bool v1_supported = has_cmov && has_cx8 && has_fpu && has_fxsr && has_mmx && has_syscall && has_sse && has_sse2;
-	bool v2_supported = v1_supported && has_cmpxchg16b && has_lahf_sahf && has_popcnt && has_sse3 && has_sse4_1 && has_sse4_2 && has_ssse3;
-	bool v3_supported = v2_supported && has_avx && has_avx2 && has_bmi1 && has_bmi2 && has_f16c && has_fma && has_lzcnt && has_movbe && has_xsave;
-	bool v4_supported = v3_supported && has_avx512f && has_avx512bw && has_avx512cd && has_avx512dq && has_avx512vl;
+	bool v1_supported = has_cmov && has_cx8 && has_fpu && has_fxsr && has_mmx && has_syscall &&
+			    has_sse && has_sse2;
+	bool v2_supported = v1_supported && has_cmpxchg16b && has_lahf_sahf && has_popcnt &&
+			    has_sse3 && has_sse4_1 && has_sse4_2 && has_ssse3;
+	bool v3_supported = v2_supported && has_avx && has_avx2 && has_bmi1 && has_bmi2 &&
+			    has_f16c && has_fma && has_lzcnt && has_movbe && has_xsave;
+	bool v4_supported = v3_supported && has_avx512f && has_avx512bw && has_avx512cd &&
+			    has_avx512dq && has_avx512vl;
 
 #if DEBUG
 	printf("Checking x86-64 microarchitecture levels:\n");
@@ -242,12 +280,20 @@ microarchitecture_level cpu_microarchitecture_levels(struct kvm_cpuid2 *cpuid)
 	printf("  x86-64-v2 supported: %s\n", v2_supported ? "Yes" : "No");
 	printf("  x86-64-v3 supported: %s\n", v3_supported ? "Yes" : "No");
 	printf("  x86-64-v4 supported: %s\n", v4_supported ? "Yes" : "No");
-#endif	
+#endif
 
-	if (v4_supported) {return x86_64_v4;}
-	if (v3_supported) {return x86_64_v3;}
-	if (v2_supported) {return x86_64_v2;}
-	if (v1_supported) {return x86_64_v1;}
+	if (v4_supported) {
+		return x86_64_v4;
+	}
+	if (v3_supported) {
+		return x86_64_v3;
+	}
+	if (v2_supported) {
+		return x86_64_v2;
+	}
+	if (v1_supported) {
+		return x86_64_v1;
+	}
 
 	return x86_64_unknown;
 }
@@ -257,7 +303,8 @@ void cpu_init_cpuid(struct vm *vm)
 	free(vm->vcpu_cpuid);
 	int max_entries = 100;
 
-	vm->vcpu_cpuid = calloc(1, sizeof(*vm->vcpu_cpuid) + (max_entries * sizeof(*vm->vcpu_cpuid->entries)));
+	vm->vcpu_cpuid = calloc(1, sizeof(*vm->vcpu_cpuid) +
+					   (max_entries * sizeof(*vm->vcpu_cpuid->entries)));
 	vm->vcpu_cpuid->nent = max_entries;
 
 	if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, vm->vcpu_cpuid) < 0) {
@@ -272,15 +319,15 @@ void cpu_init_cpuid(struct vm *vm)
 	*/
 	for (uint32_t i = 0; i < vm->vcpu_cpuid->nent; i++) {
 		/*
-    	function:
-    	    the eax value used to obtain the entry
-    	index:
-    	    the ecx value used to obtain the entry (for entries that are affected by ecx)
-    	flags:
-    	    an OR of zero or more of the following:
+	function:
+	    the eax value used to obtain the entry
+	index:
+	    the ecx value used to obtain the entry (for entries that are affected by ecx)
+	flags:
+	    an OR of zero or more of the following:
 			KVM_CPUID_FLAG_SIGNIFCANT_INDEX: if the index field is valid
-    	    eax, ebx, ecx, edx:
-    	        the values returned by the cpuid instruction for this function/index combination
+	    eax, ebx, ecx, edx:
+		the values returned by the cpuid instruction for this function/index combination
 		*/
 		struct kvm_cpuid_entry2 *entry = &vm->vcpu_cpuid->entries[i];
 		if (entry->function == 1 && entry->index == 0) {
@@ -354,10 +401,10 @@ void cpu_init_avx(struct kvm_sregs2 *sregs, struct kvm_xcrs *xrcs)
 
 void cpu_init_avx512(struct kvm_xcrs *xrcs)
 {
-	#define XCR0_OPMASK (1LL << 5)
-	#define ZMM_Hi256 (1LL << 6)
-	#define Hi16_ZMM (1LL << 7)
-	
+#define XCR0_OPMASK (1LL << 5)
+#define ZMM_Hi256 (1LL << 6)
+#define Hi16_ZMM (1LL << 7)
+
 	for (uint32_t i = 0; i < xrcs->nr_xcrs; i++) {
 		// found xcr0
 		if (xrcs->xcrs[i].xcr == 0) {
@@ -372,12 +419,14 @@ not all features are initialized for all levels
 TODO: check if all expected features are enabled
 */
 
-void cpu_init_v1(struct kvm_sregs2 *sregs, struct kvm_fpu *fpu) {
+void cpu_init_v1(struct kvm_sregs2 *sregs, struct kvm_fpu *fpu)
+{
 	cpu_init_fpu(fpu);
 	cpu_init_sse(sregs);
 }
 
-void cpu_init_v2(void) {
+void cpu_init_v2(void)
+{
 	// SSE2 ... are automatically enabled if supported
 	// nothing to do
 }
@@ -446,7 +495,6 @@ void vm_init(struct vm *vm)
 
 	cpu_init_cache(&sregs);
 
-
 	// TODO: make it better
 	if (vcpulevel == x86_64_unknown) {
 		PANIC("cpu not supported");
@@ -462,7 +510,7 @@ void vm_init(struct vm *vm)
 	}
 	if (vcpulevel == x86_64_v4) {
 		cpu_init_v4(&xcrs);
-	} 
+	}
 
 	if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_SET_REGS");
