@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
+#include "vm.h"
 #include "guest_inspector.h"
 #include "debugger.h"
 #include "utils.h"
