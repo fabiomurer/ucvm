@@ -8,6 +8,7 @@ struct vm {
 	int kvmfd;
 	int vmfd;
 	int vcpufd;
+	struct kvm_cpuid2 *vcpu_cpuid;
 	struct kvm_run *run;
 	void *memory;
 
