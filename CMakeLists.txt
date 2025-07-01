@@ -27,7 +27,7 @@ include_directories(
 )
 
 # Collect source files
-file(GLOB SOURCES "src/*.c")
+file(GLOB SOURCES "src/*.c" "src/vlinux/*.c")
 
 # Create executable
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -55,7 +55,9 @@ find_program(CLANG_TIDY "clang-tidy")
 # Get all source files
 file(GLOB_RECURSE ALL_SOURCE_FILES 
     ${CMAKE_SOURCE_DIR}/src/*.c
+    ${CMAKE_SOURCE_DIR}/src/vlinux/*.c
     ${CMAKE_SOURCE_DIR}/include/*.h
+    ${CMAKE_SOURCE_DIR}/include/vlinux/*.h
 )
 
 # Add target to run clang-format on all source files

@@ -19,85 +19,17 @@
 #include "utils.h"
 #include "view_linux.h"
 #include "vsyscall.h"
-#include "vmm.h"
 
-uint64_t vlinux_syscall_mmap(struct linux_view *linux_view, void *addr, size_t lenght, int prot,
-			     int flags, int fd, off_t offset)
-{
-	uint64_t ret = 0;
+#include "vlinux/vlinux_syscall_read.h"
+#include "vlinux/vlinux_syscall_write.h"
+#include "vlinux/vlinux_syscall_open.h"
+#include "vlinux/vlinux_syscall_close.h"
+#include "vlinux/vlinux_syscall_fstat.h"
+#include "vlinux/vlinux_syscall_mmap.h"
+#include "vlinux/vlinux_syscall_munmap.h"
+#include "vlinux/vlinux_syscall_brk.h"
 
-	if (!(flags & MAP_PRIVATE)) {
-		PANIC("vlinux_syscall_mmap MAP_SHARED not supported");
-	}
-
-	// simple, no fils need to be open
-	if (flags & MAP_ANONYMOUS) {
-		ret = linux_view_do_syscall(linux_view, __NR_mmap, (uint64_t)addr, lenght, prot,
-					    flags, fd, offset);
-	} else {
-		// make linux view open file, mmap, close file
-
-		// copy file name parameter
-		char *filename = get_path_from_fd(fd);
-		if (filename == nullptr) {
-			PANIC("get_path_from_fd");
-		}
-
-		off64_t view_addr = linux_view_alloc_mem(linux_view, (size_t)PATH_MAX);
-
-		if (linux_view_write_mem(linux_view, view_addr, filename, PATH_MAX) != 0) {
-			PANIC("linux_view_write_mem");
-		}
-
-		// open it
-		uint64_t view_fd = linux_view_do_syscall(linux_view, __NR_open, view_addr, O_RDONLY,
-							 0, 0, 0, 0);
-		if (view_fd == (uint64_t)-1) {
-			PANIC("linux_view_do_syscall(__NR_open)");
-		}
-
-		ret = linux_view_do_syscall(linux_view, __NR_mmap, (uint64_t)addr, lenght, prot,
-					    flags, view_fd, offset);
-
-		// cleanup
-		free(filename);
-		(void)linux_view_do_syscall(linux_view, __NR_close, view_fd, 0, 0, 0, 0, 0);
-		linux_view_free_mem(linux_view, view_addr, (size_t)PATH_MAX);
-	}
-
-	return ret;
-}
-
-uint64_t vlinux_syscall_brk(struct linux_view *linux_view, uint64_t addr)
-{
-	/*
-	the actual Linux system call returns the new program
-	break on success.  On failure, the system call returns the current
-	break.
-	*/
-	uint64_t brk = linux_view_do_syscall(linux_view, __NR_brk, addr, 0, 0, 0, 0, 0);
-	return brk;
-}
-
-uint64_t vlinux_syscall_arch_prctl(struct vm *vm, uint64_t op, uint64_t addr)
-{
-	uint64_t ret = -1;
-
-	switch (op) {
-	case ARCH_SET_FS:
-		struct kvm_sregs *sregs = vm_get_sregs(vm);
-
-		// set the base address of fs register to addr
-		sregs->fs.base = addr;
-
-		vm_set_sregs(vm);
-		return 0;
-	default:
-		PANIC("vlinux_syscall_arch_prctl OP NOT SUPPORTED");
-		break;
-	}
-	return ret;
-}
+#include "vlinux/vlinux_syscall_arch_prctl.h"
 
 #define HANDLE_SYSCALL(nr)                     \
 	case nr:                               \
@@ -122,14 +54,8 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int fd = (int)arg1;
 			uint64_t buff = arg2;
 			size_t len = arg3;
-			uint8_t *tmp_buff = malloc(sizeof(uint8_t) * len);
 
-			ret = read(fd, tmp_buff, len);
-
-			if (write_buffer_guest(vm, buff, tmp_buff, len) < 0) {
-				PANIC("write_buffer_guest");
-			}
-			free(tmp_buff);
+			ret = vlinux_syscall_read(vm, fd, buff, len);
 		}
 		break;
 
@@ -138,13 +64,8 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int fd = (int)arg1;
 			uint64_t buff = arg2;
 			size_t len = arg3;
-			uint8_t *tmp_buff = malloc(sizeof(uint8_t) * len);
-			if (read_buffer_host(vm, buff, tmp_buff, len) < 0) {
-				PANIC("read_buffer_host");
-			}
 
-			ret = write(fd, tmp_buff, len);
-			free(tmp_buff);
+			ret = vlinux_syscall_write(vm, fd, buff, len);
 		}
 		break;
 
@@ -154,41 +75,39 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int flags = (int)arg2;
 			mode_t mode = (mode_t)arg3;
 
-			char tmp_filename[PATH_MAX];
-			if (read_string_host(vm, filename, tmp_filename, PATH_MAX) < 0) {
-				PANIC("read_string_host");
-			}
-			ret = open(tmp_filename, flags, mode);
+			ret = vlinux_syscall_open(vm, filename, flags, mode);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_close)
 		{
 			int fd = (int)arg1;
-			ret = close(fd);
-			break;
+
+			ret = vlinux_syscall_close(fd);
 		}
+		break;
 
 		HANDLE_SYSCALL(__NR_fstat)
 		{
 			int fd = (int)arg1;
 			uint64_t statbuf = arg2;
-			struct stat tmp_statbuf;
 
-			if (fstat(fd, &tmp_statbuf) < 0) {
-				ret = -errno;
-			} else {
-				if (write_buffer_guest(vm, statbuf, (uint8_t *)&tmp_statbuf,
-						       sizeof(tmp_statbuf)) < 0) {
-					PANIC("write_buffer_guest");
-				}
-			}
+			ret = vlinux_syscall_fstat(vm, fd, statbuf);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_mmap)
-		ret = vlinux_syscall_mmap(&vm->linux_view, (void *)arg1, (size_t)arg2, (int)arg3,
-					  (int)arg4, (int)arg5, (off_t)arg6);
+		{
+			void *addr = (void *)arg1;
+			size_t lenght = (size_t)arg2;
+			int prot = (int)arg3;
+			int flags = (int)arg4;
+			int fd = (int)arg5;
+			off_t offset = (off_t)arg6;
+
+			ret = vlinux_syscall_mmap(&vm->linux_view, addr, lenght, prot, flags, fd,
+						  offset);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_mprotect)
@@ -198,18 +117,18 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		{
 			uint64_t addr = arg1;
 			uint64_t len = arg2;
-			ret = linux_view_do_syscall(&vm->linux_view, __NR_munmap, addr, len, 0, 0,
-						    0, 0);
 
-			// unmap in the guest
-			if (ret == 0) { // successful unmap
-				unmap_range(addr, len);
-			}
+			ret = vlinux_syscall_munmap(&vm->linux_view, addr, len);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_brk)
-		ret = vlinux_syscall_brk(&vm->linux_view, arg1);
+		{
+			uint64_t addr = arg1;
+
+			ret = vlinux_syscall_brk(&vm->linux_view, addr);
+		}
+
 		break;
 
 		HANDLE_SYSCALL(__NR_pread64)
@@ -251,7 +170,12 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		break;
 
 		HANDLE_SYSCALL(__NR_arch_prctl)
-		ret = vlinux_syscall_arch_prctl(vm, arg1, arg2);
+		{
+			uint64_t op = arg1;
+			uint64_t addr = arg2;
+
+			ret = vlinux_syscall_arch_prctl(vm, op, addr);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_set_tid_address)
