@@ -28,6 +28,13 @@
 #include "vlinux/vlinux_syscall_mmap.h"
 #include "vlinux/vlinux_syscall_munmap.h"
 #include "vlinux/vlinux_syscall_brk.h"
+#include "vlinux/vlinux_syscall_pread64.h"
+#include "vlinux/vlinux_syscall_access.h"
+#include "vlinux/vlinux_syscall_getpid.h"
+#include "vlinux/vlinux_syscall_exit.h"
+#include "vlinux/vlinux_syscall_set_tid_address.h"
+#include "vlinux/vlinux_syscall_exit_group.h"
+#include "vlinux/vlinux_syscall_openat.h"
 
 #include "vlinux/vlinux_syscall_arch_prctl.h"
 
@@ -138,14 +145,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			size_t count = arg3;
 			off_t offset = arg4;
 
-			uint8_t *tmp_buff = malloc(count);
-
-			ret = syscall(__NR_pread64, fd, tmp_buff, count, offset);
-
-			if (write_buffer_guest(vm, buf, tmp_buff, count) < 0) {
-				PANIC("write_buffer_guest");
-			}
-			free(tmp_buff);
+			ret = vlinux_syscall_pread64(vm, fd, buf, count, offset);
 		}
 		break;
 
@@ -154,19 +154,22 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t pathname = arg1;
 			int mode = (int)arg2;
 
-			char tmp_pathname[PATH_MAX] = { 0 };
-			read_string_host(vm, pathname, tmp_pathname, PATH_MAX);
-
-			ret = syscall(__NR_access, tmp_pathname, mode);
+			ret = vlinux_syscall_access(vm, pathname, mode);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_getpid)
-		ret = getpid();
+		{
+			ret = vlinux_syscall_getpid();
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_exit)
-		_exit(arg1);
+		{
+			int status = (int)arg1;
+
+			vlinux_syscall_exit(status);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_arch_prctl)
@@ -179,21 +182,16 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		break;
 
 		HANDLE_SYSCALL(__NR_set_tid_address)
-		/*
-		The system call set_tid_address() sets the clear_child_tid value
-		for the calling thread to tidptr.
-		*/
-
-		/*
-		set_tid_address() always returns the caller's thread ID.
-		for now 1 thread -> thread ID = 0
-		*/
-		ret = 0;
+		{
+			ret = vlinux_syscall_set_tid_address();
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_exit_group)
-		int status = (int)arg1;
-		syscall(SYS_exit_group, status);
+		{
+			int status = (int)arg1;
+			ret = vlinux_syscall_exit_group(status);
+		}
 		break;
 
 		HANDLE_SYSCALL(__NR_openat)
@@ -203,10 +201,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int flags = (int)arg3;
 			mode_t mode = (mode_t)arg4;
 
-			char tmp_filename[PATH_MAX] = { 0 };
-			read_string_host(vm, filename, tmp_filename, PATH_MAX);
-
-			ret = syscall(__NR_openat, dirfd, tmp_filename, flags, mode);
+			ret = vlinux_syscall_openat(vm, dirfd, filename, flags, mode);
 		}
 		break;
 
