@@ -20,23 +20,27 @@
 #include "view_linux.h"
 #include "vsyscall.h"
 
-#include "vlinux/vlinux_syscall_read.h"
-#include "vlinux/vlinux_syscall_write.h"
-#include "vlinux/vlinux_syscall_open.h"
-#include "vlinux/vlinux_syscall_close.h"
-#include "vlinux/vlinux_syscall_fstat.h"
-#include "vlinux/vlinux_syscall_mmap.h"
-#include "vlinux/vlinux_syscall_munmap.h"
-#include "vlinux/vlinux_syscall_brk.h"
-#include "vlinux/vlinux_syscall_pread64.h"
-#include "vlinux/vlinux_syscall_access.h"
-#include "vlinux/vlinux_syscall_getpid.h"
-#include "vlinux/vlinux_syscall_exit.h"
-#include "vlinux/vlinux_syscall_set_tid_address.h"
-#include "vlinux/vlinux_syscall_exit_group.h"
-#include "vlinux/vlinux_syscall_openat.h"
-
-#include "vlinux/vlinux_syscall_arch_prctl.h"
+#include "vlinux/syscall_read.h"
+#include "vlinux/syscall_write.h"
+#include "vlinux/syscall_open.h"
+#include "vlinux/syscall_close.h"
+#include "vlinux/syscall_fstat.h"
+#include "vlinux/syscall_mmap.h"
+#include "vlinux/syscall_munmap.h"
+#include "vlinux/syscall_brk.h"
+#include "vlinux/syscall_pread64.h"
+#include "vlinux/syscall_access.h"
+#include "vlinux/syscall_getpid.h"
+#include "vlinux/syscall_exit.h"
+#include "vlinux/syscall_arch_prctl.h"
+#include "vlinux/syscall_set_tid_address.h"
+#include "vlinux/syscall_exit_group.h"
+#include "vlinux/syscall_openat.h"
+#include "vlinux/syscall_readlinkat.h"
+#include "vlinux/syscall_set_robust_list.h"
+#include "vlinux/syscall_prlimit64.h"
+#include "vlinux/syscall_getrandom.h"
+#include "vlinux/syscall_rseq.h"
 
 #define HANDLE_SYSCALL(nr)                     \
 	case nr:                               \
@@ -62,7 +66,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t buff = arg2;
 			size_t len = arg3;
 
-			ret = vlinux_syscall_read(vm, fd, buff, len);
+			ret = syscall_read(vm, fd, buff, len);
 		}
 		break;
 
@@ -72,7 +76,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t buff = arg2;
 			size_t len = arg3;
 
-			ret = vlinux_syscall_write(vm, fd, buff, len);
+			ret = syscall_write(vm, fd, buff, len);
 		}
 		break;
 
@@ -82,7 +86,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int flags = (int)arg2;
 			mode_t mode = (mode_t)arg3;
 
-			ret = vlinux_syscall_open(vm, filename, flags, mode);
+			ret = syscall_open(vm, filename, flags, mode);
 		}
 		break;
 
@@ -90,7 +94,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		{
 			int fd = (int)arg1;
 
-			ret = vlinux_syscall_close(fd);
+			ret = syscall_close(fd);
 		}
 		break;
 
@@ -99,7 +103,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int fd = (int)arg1;
 			uint64_t statbuf = arg2;
 
-			ret = vlinux_syscall_fstat(vm, fd, statbuf);
+			ret = syscall_fstat(vm, fd, statbuf);
 		}
 		break;
 
@@ -112,12 +116,12 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int fd = (int)arg5;
 			off_t offset = (off_t)arg6;
 
-			ret = vlinux_syscall_mmap(&vm->linux_view, addr, lenght, prot, flags, fd,
+			ret = syscall_mmap(&vm->linux_view, addr, lenght, prot, flags, fd,
 						  offset);
 		}
 		break;
 
-		HANDLE_SYSCALL(__NR_mprotect)
+		HANDLE_SYSCALL(__NR_mprotect) // ignored
 		break;
 
 		HANDLE_SYSCALL(__NR_munmap)
@@ -125,7 +129,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t addr = arg1;
 			uint64_t len = arg2;
 
-			ret = vlinux_syscall_munmap(&vm->linux_view, addr, len);
+			ret = syscall_munmap(&vm->linux_view, addr, len);
 		}
 		break;
 
@@ -133,7 +137,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		{
 			uint64_t addr = arg1;
 
-			ret = vlinux_syscall_brk(&vm->linux_view, addr);
+			ret = syscall_brk(&vm->linux_view, addr);
 		}
 
 		break;
@@ -145,7 +149,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			size_t count = arg3;
 			off_t offset = arg4;
 
-			ret = vlinux_syscall_pread64(vm, fd, buf, count, offset);
+			ret = syscall_pread64(vm, fd, buf, count, offset);
 		}
 		break;
 
@@ -154,13 +158,13 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t pathname = arg1;
 			int mode = (int)arg2;
 
-			ret = vlinux_syscall_access(vm, pathname, mode);
+			ret = syscall_access(vm, pathname, mode);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_getpid)
 		{
-			ret = vlinux_syscall_getpid();
+			ret = syscall_getpid();
 		}
 		break;
 
@@ -168,7 +172,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		{
 			int status = (int)arg1;
 
-			vlinux_syscall_exit(status);
+			syscall_exit(status);
 		}
 		break;
 
@@ -177,20 +181,20 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t op = arg1;
 			uint64_t addr = arg2;
 
-			ret = vlinux_syscall_arch_prctl(vm, op, addr);
+			ret = syscall_arch_prctl(vm, op, addr);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_set_tid_address)
 		{
-			ret = vlinux_syscall_set_tid_address();
+			ret = syscall_set_tid_address();
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_exit_group)
 		{
 			int status = (int)arg1;
-			ret = vlinux_syscall_exit_group(status);
+			ret = syscall_exit_group(status);
 		}
 		break;
 
@@ -201,79 +205,53 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int flags = (int)arg3;
 			mode_t mode = (mode_t)arg4;
 
-			ret = vlinux_syscall_openat(vm, dirfd, filename, flags, mode);
+			ret = syscall_openat(vm, dirfd, filename, flags, mode);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_readlinkat)
-		char pathname[PATH_MAX];
-		if (read_string_host(vm, arg2, pathname, PATH_MAX) < 0) {
-			PANIC("read_string_host");
-		}
-		int dirfd = (int)arg1;
+		{
+			int dirfd = (int)arg1;
+			uint64_t pathname = arg2;
+			uint64_t buf  = arg3;
+			int bufsiz = (int)arg4;
 
-		// support only get process path
-		if (strcmp("/proc/self/exe", pathname) == 0 && dirfd == AT_FDCWD) {
-			char buf[PATH_MAX] = "\0";
-			if (realpath(vm->linux_view.argv[0], buf) == NULL) {
-				PANIC_PERROR("realpath");
-			}
-			ret = strlen(buf);
-
-			if (write_string_guest(vm, arg3, buf, PATH_MAX) < 0) {
-				PANIC("write_string_guest");
-			}
-		} else {
-			PANIC("__NR_readlinkat case not supported");
-			ret = -1;
+			ret = syscall_readlinkat(vm, dirfd, pathname, buf, bufsiz);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_set_robust_list)
-		/*
-		The set_robust_list() system call requests the kernel to record
-		the head of the list of robust futexes owned by the calling
-		thread.  The head argument is the list head to record.  The size
-		argument should be sizeof(*head).
-		*/
-		if (arg2 == sizeof(struct robust_list_head)) {
-			// linux_proc->robust_list_head_ptr = arg1;
-			ret = 0;
-		} else {
-			ret = -1;
+		{
+			uint64_t head = arg1;
+			size_t size = arg2;
+
+			ret = syscall_set_robust_list(head, size);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_prlimit64)
-		if (arg1 == 0 && arg2 == RLIMIT_STACK) {
-			// for vm no limit for stack-> do nothing
-			ret = 0;
-		} else {
-			PANIC("__NR_prlimit64 case not supported");
+		{
+			pid_t pid = (pid_t)arg1;
+			int resource =(int)arg2;
+
+			ret = syscall_prlimit64(pid, resource);
 		}
 		break;
 
 		HANDLE_SYSCALL(__NR_getrandom)
-		uint64_t buf = arg1;
-		size_t buflen = arg2;
-		unsigned int flags = arg3;
+		{
+			uint64_t buf = arg1;
+			size_t buflen = arg2;
+			unsigned int flags = arg3;
 
-		uint8_t *tbuf = malloc(buflen * sizeof(char));
-		if (tbuf == NULL)
-			PANIC_PERROR("malloc");
-
-		ret = getrandom(tbuf, buflen, flags);
-		if (write_buffer_guest(vm, buf, tbuf, buflen) < 0) {
-			PANIC("write_buffer_guest");
+			ret = syscall_getrandom(vm, buf, buflen, flags);
 		}
-
-		free(tbuf);
 		break;
 
-		// https://manpages.opensuse.org/Tumbleweed/librseq-devel/rseq.2.en.html
-		HANDLE_SYSCALL(__NR_rseq) // what is this?? not implemented ->
-					  // hopefully not used
-		ret = 0;
+		HANDLE_SYSCALL(__NR_rseq)
+		{
+			ret = syscall_rseq();
+		}
 		break;
 
 	default:
