@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <linux/limits.h>
 
-uint64_t syscall_mmap(struct linux_view *linux_view, void *addr, size_t lenght, int prot,
-			     int flags, int fd, off_t offset)
+uint64_t syscall_mmap(struct linux_view *linux_view, void *addr, size_t lenght, int prot, int flags,
+		      int fd, off_t offset)
 {
 	uint64_t ret = 0;
 

@@ -3,5 +3,5 @@
 
 uint64_t syscall_exit(int status)
 {
-    _exit(status);
+	_exit(status);
 }

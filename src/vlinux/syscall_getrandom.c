@@ -8,17 +8,17 @@
 
 uint64_t syscall_getrandom(struct vm *vm, uint64_t buf, size_t buflen, unsigned int flags)
 {
-    uint8_t *tbuf = malloc(buflen);
+	uint8_t *tbuf = malloc(buflen);
 	if (tbuf == NULL) {
-        PANIC_PERROR("malloc");
-    }
-		
+		PANIC_PERROR("malloc");
+	}
+
 	uint64_t ret = getrandom(tbuf, buflen, flags);
-	
-    if (write_buffer_guest(vm, buf, tbuf, buflen) < 0) {
+
+	if (write_buffer_guest(vm, buf, tbuf, buflen) < 0) {
 		PANIC("write_buffer_guest");
 	}
-    free(tbuf);
+	free(tbuf);
 
-    return ret;
+	return ret;
 }

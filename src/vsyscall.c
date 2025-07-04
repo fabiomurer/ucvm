@@ -116,8 +116,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int fd = (int)arg5;
 			off_t offset = (off_t)arg6;
 
-			ret = syscall_mmap(&vm->linux_view, addr, lenght, prot, flags, fd,
-						  offset);
+			ret = syscall_mmap(&vm->linux_view, addr, lenght, prot, flags, fd, offset);
 		}
 		break;
 
@@ -213,7 +212,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		{
 			int dirfd = (int)arg1;
 			uint64_t pathname = arg2;
-			uint64_t buf  = arg3;
+			uint64_t buf = arg3;
 			int bufsiz = (int)arg4;
 
 			ret = syscall_readlinkat(vm, dirfd, pathname, buf, bufsiz);
@@ -232,7 +231,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		HANDLE_SYSCALL(__NR_prlimit64)
 		{
 			pid_t pid = (pid_t)arg1;
-			int resource =(int)arg2;
+			int resource = (int)arg2;
 
 			ret = syscall_prlimit64(pid, resource);
 		}

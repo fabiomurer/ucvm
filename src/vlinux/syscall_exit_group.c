@@ -4,5 +4,5 @@
 
 uint64_t syscall_exit_group(int status)
 {
-    return syscall(SYS_exit_group, status);
+	return syscall(SYS_exit_group, status);
 }

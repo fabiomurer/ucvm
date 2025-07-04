@@ -9,7 +9,7 @@
 
 uint64_t syscall_pread64(struct vm *vm, int fd, uint64_t buf, size_t count, off_t offset)
 {
-    uint8_t *tmp_buff = malloc(count);
+	uint8_t *tmp_buff = malloc(count);
 
 	uint64_t ret = syscall(__NR_pread64, fd, tmp_buff, count, offset);
 
@@ -18,5 +18,5 @@ uint64_t syscall_pread64(struct vm *vm, int fd, uint64_t buf, size_t count, off_
 	}
 	free(tmp_buff);
 
-    return ret;
+	return ret;
 }
