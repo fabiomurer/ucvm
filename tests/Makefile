@@ -10,16 +10,16 @@ hello-glibc: hello-glibc.c
 hello-glibc-dyn: hello-glibc.c
 	gcc -g -o hello-glibc-dyn hello-glibc.c
 
-hello: hello.c
+hello: hello.c syscall.h
 	gcc -g -static -nostdlib -o hello hello.c 
 
-test-syscall: test-syscall.c
+test-syscall: test-syscall.c syscall.h
 	gcc -static -nostdlib -o test-syscall test-syscall.c 
 
-test-cpu: test-cpu.c
+test-cpu: test-cpu.c syscall.h
 	gcc -static -nostdlib -o test-cpu test-cpu.c 
 
-test-io: test-io.c
+test-io: test-io.c syscall.h
 	gcc -static -nostdlib -o test-io test-io.c
 
 read_secrets: read_secrets.c
@@ -27,5 +27,4 @@ read_secrets: read_secrets.c
 
 clean:
 	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu nothing-glibc test-io read_secrets
-
 .PHONY: all clean
