@@ -5,4 +5,5 @@ test-syscall
 test-cpu
 test-io
 nothing-glibc
+read_secrets
 test-vdso
