@@ -22,7 +22,12 @@ test-cpu: test-cpu.c syscall.h
 test-io: test-io.c syscall.h
 	gcc -static -nostdlib -o test-io test-io.c
 
-clean:
-	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu nothing-glibc test-io 
+read_secrets: read_secrets.c
+	gcc -o read_secrets read_secrets.c
 
+test-vdso: test-vdso.c
+	gcc -o test-vdso test-vdso.c
+
+clean:
+	rm -f hello-glibc hello hello-glibc-dyn test-syscall test-cpu nothing-glibc test-io test-vdso read_secrets
 .PHONY: all clean
