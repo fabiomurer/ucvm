@@ -21,5 +21,4 @@ hyperfine -i --export-markdown "/tmp/$PROGRAM_NAME.md" \
   "$PROGRAM_PATH" \
   "../../release/ucvm -- $PROGRAM_PATH" \
   "../../release/ucvm -p0 -- $PROGRAM_PATH" \
-  "umvu $PROGRAM_PATH" \
-  "umvu -S $PROGRAM_PATH"
+  "qemu-x86_64 $PROGRAM_PATH"
