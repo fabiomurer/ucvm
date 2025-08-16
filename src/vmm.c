@@ -8,6 +8,9 @@
 static void *guest_memory;
 static struct frame pml4t_addr;
 
+#define GDTENTRY_SIZE 8
+#define IDTENTRY_SIZE 8
+
 /*
 GDT entry 8 bytes long -> 64 bits
 
@@ -82,9 +85,6 @@ struct __attribute__((packed)) seg_desc {
 	uint16_t limit1 : 4, avl : 1, l : 1, d : 1, g : 1, base2 : 8;
 };
 
-#define GDT_OFFSET 0x500
-#define IDT_OFFSET 0x520
-
 static const struct seg_desc CODE_SEG = {
 	.limit0 = 0xFFFF,
 	.base0 = 0,
@@ -122,7 +122,7 @@ static struct kvm_segment seg_from_desc(struct seg_desc e, uint32_t idx)
 	struct kvm_segment res = {
 		.base = e.base0 | ((uint64_t)e.base1 << 16) | ((uint64_t)e.base2 << 24),
 		.limit = (uint64_t)e.limit0 | ((uint64_t)e.limit1 << 16),
-		.selector = idx * 8,
+		.selector = idx * GDTENTRY_SIZE,
 		.type = e.type,
 		.present = e.p,
 		.dpl = e.dpl,
@@ -249,42 +249,54 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 
 	free_frames_list_init();
 
-	// alloc one page for GDT (used) IDT (not used)
+	// allocate one page for the pml4
 	if (get_free_frame(&pml4t_addr) != 0) {
 		PANIC("get_free_frame");
 	}
+	
+	// GDT 
+	// alloc one page for GDT
 	struct frame mem_gdt = { 0 };
 	if (get_free_frame(&mem_gdt) != 0) {
 		PANIC("get_free_frame");
 	}
 
-	void *gdt_addr = (void *)(mem_gdt.host_virtual_addr + GDT_OFFSET);
+	void *gdt_addr = (void *)mem_gdt.host_virtual_addr;
 
 	struct kvm_segment code_segment = seg_from_desc(CODE_SEG, 1);
 	struct kvm_segment data_segment = seg_from_desc(DATA_SEG, 2);
 
-	// null descriptor
-	memset(gdt_addr, 0, 8);
+	// set all to null, so first is null descriptor
+	memset(gdt_addr, 0, PAGE_SIZE);
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 	// one code segment
-	memcpy(gdt_addr + 8, &CODE_SEG, 8);
+	memcpy(gdt_addr + GDTENTRY_SIZE, &CODE_SEG, GDTENTRY_SIZE);
 	// one data segment
-	memcpy(gdt_addr + 16, &DATA_SEG, 8);
+	memcpy(gdt_addr + ((ptrdiff_t)(2 * GDTENTRY_SIZE)), &DATA_SEG, GDTENTRY_SIZE);
 #pragma GCC diagnostic pop
 
 	// start address of gdt in guest
-	sregs->gdt.base = GDT_OFFSET + mem_gdt.guest_physical_addr;
+	sregs->gdt.base = mem_gdt.guest_physical_addr;
 	// size of the table (2 entry, 1 null)
-	sregs->gdt.limit = 3 * 8 - 1;
+	sregs->gdt.limit = (3 * GDTENTRY_SIZE) - 1;
 
-	// IDT (interrupt description table) initialization, all null not used
-	memset((void *)(mem_gdt.host_virtual_addr + IDT_OFFSET), 0, 8);
-	// start address of IDT in guest
-	sregs->idt.base = IDT_OFFSET + mem_gdt.guest_physical_addr;
-	// IDT size (one null)
-	sregs->idt.limit = 7;
+
+	// IDT
+	// alloc one page for IDT
+	struct frame mem_idt = { 0 };
+	if (get_free_frame(&mem_idt) != 0) {
+		PANIC("get_free_frame");
+	}
+
+	void *idt_addr = (void *)mem_idt.host_virtual_addr;
+
+	// IDT (interrupt description table) initialization, all null not used TODO: understand if necessary
+	memset(idt_addr, 0, PAGE_SIZE);
+
+	sregs->idt.base = mem_gdt.guest_physical_addr;
+	sregs->idt.limit = 0; // not used
 
 	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
 	sregs->cr3 = (uint64_t)pml4t_addr.guest_physical_addr;
