@@ -91,7 +91,7 @@ static const struct seg_desc CODE_SEG = {
 	.base1 = 0,
 	.type = (TYPE_A_ACCES_DONTSET | TYPE_RW_CODE_READ | TYPE_DC_CODE_EXEC_IFDLP | TYPE_E_CODE),
 	.s = S_DATA_OR_CODE,
-	.dpl = DLP_KERNEL,
+	.dpl = DLP_KERNEL, //DLP_USER, 
 	.p = P_VALID,
 	.limit1 = 0xF,
 	.avl = AVL,
@@ -107,7 +107,7 @@ static const struct seg_desc DATA_SEG = {
 	.base1 = 0,
 	.type = 0x2 | 0x1,
 	.s = S_DATA_OR_CODE,
-	.dpl = DLP_KERNEL,
+	.dpl = DLP_KERNEL, //DLP_USER,
 	.p = P_VALID,
 	.limit1 = (TYPE_A_ACCES_DONTSET | TYPE_RW_DATA_WRITE | TYPE_E_DATA),
 	.avl = AVL,
@@ -117,12 +117,14 @@ static const struct seg_desc DATA_SEG = {
 	.base2 = 0,
 };
 
+#define RPL_USER 3
+
 static struct kvm_segment seg_from_desc(struct seg_desc e, uint32_t idx)
 {
 	struct kvm_segment res = {
 		.base = e.base0 | ((uint64_t)e.base1 << 16) | ((uint64_t)e.base2 << 24),
 		.limit = (uint64_t)e.limit0 | ((uint64_t)e.limit1 << 16),
-		.selector = idx * GDTENTRY_SIZE,
+		.selector = (idx * GDTENTRY_SIZE), // | RPL_USER, // https://wiki.osdev.org/Segment_Selector RPL
 		.type = e.type,
 		.present = e.p,
 		.dpl = e.dpl,
@@ -282,11 +284,11 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 	// size of the table (2 entry, 1 null)
 	sregs->gdt.limit = (3 * GDTENTRY_SIZE) - 1;
 
-
+	
 	// IDT
 	// alloc one page for IDT
 
-	/* 
+	/*
 	// VECCHIO--------------
 	struct frame mem_idt = { 0 };
 	if (get_free_frame(&mem_idt) != 0) {
@@ -370,6 +372,7 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 
 #define PAGE_PRESENT (1ULL << 0)
 #define PAGE_RW (1ULL << 1)
+#define PAGE_USER (1ULL << 2)
 
 // cache
 #define PAGE_PWT (1ULL << 3) /* Page Write Through */
@@ -381,7 +384,7 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 #define PAGE_CACHE_UC_MINUS PAGE_PCD	    /* Uncacheable minus PCD=1*/
 #define PAGE_CACHE_UC (PAGE_PCD | PAGE_PWT) /* Uncacheable PWT,PCD=1*/
 
-#define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB)
+#define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB) // | PAGE_USER
 // ?
 struct frame jump_next_frame(uint64_t gaddr)
 {
