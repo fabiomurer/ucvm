@@ -27,6 +27,8 @@ struct frame {
 
 void *host_virtual_addr_to_guest_physical_addr(uint64_t vaddr);
 
+void map_addr(uint64_t vaddr, uint64_t phys_addr);
+
 uintptr_t map_page(uint64_t vaddr);
 
 int unmap_addr(uint64_t vaddr);

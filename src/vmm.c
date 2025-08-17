@@ -285,6 +285,9 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 
 	// IDT
 	// alloc one page for IDT
+
+	/* 
+	// VECCHIO--------------
 	struct frame mem_idt = { 0 };
 	if (get_free_frame(&mem_idt) != 0) {
 		PANIC("get_free_frame");
@@ -297,6 +300,46 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 
 	sregs->idt.base = mem_gdt.guest_physical_addr;
 	sregs->idt.limit = 0; // not used
+	*/
+
+	
+	// NUOVO ----------------
+	struct idt_entry {
+		uint16_t offset_low;
+		uint16_t selector;
+		uint8_t  ist;
+		uint8_t  type_attr; // Type and attributes (P, DPL, etc.)
+		uint16_t offset_mid;
+		uint32_t offset_high;
+		uint32_t zero;
+	} __attribute__((packed));
+
+	// alloc one page for IDT
+	struct frame mem_idt = { 0 };
+	if (get_free_frame(&mem_idt) != 0) {
+		PANIC("get_free_frame");
+	}
+
+	map_addr(mem_idt.guest_physical_addr, mem_idt.guest_physical_addr);
+	struct idt_entry *idt = (struct idt_entry *)mem_idt.host_virtual_addr;
+
+	// Set up a template for a non-present interrupt gate.
+	// Any attempt to use this gate will cause a #NP fault (Not Present),
+	// which triggers a KVM_EXIT_EXCEPTION to the VMM.
+	struct idt_entry entry = { 0 };
+	entry.selector = code_segment.selector; // Selector for the code segment
+	// Type = 64-bit Interrupt Gate (0xE), DPL = 0, Present = 0
+	entry.type_attr = 0x8E & ~0x80; // Clear the P bit (bit 7)
+
+	// Fill the entire IDT with non-present gates.
+	for (int i = 0; i < 256; i++) {
+		idt[i] = entry;
+	}
+
+	// Set the IDTR to point to our new table.
+	sregs->idt.base = mem_idt.guest_physical_addr;
+	sregs->idt.limit = (256 * sizeof(struct idt_entry)) - 1;
+	
 
 	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
 	sregs->cr3 = (uint64_t)pml4t_addr.guest_physical_addr;

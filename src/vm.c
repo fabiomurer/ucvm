@@ -639,7 +639,12 @@ void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 
 void vm_exit_handler(int exit_code, struct vm *vm)
 {
+	vcpu_events_logs(vm);
 	switch (exit_code) {
+	case KVM_EXIT_EXCEPTION:
+		printf("URRA exception!!\n");
+		exit(0);
+		break;
 	case KVM_EXIT_DEBUG:
 		printf("KVM_EXIT_DEBUG\n");
 		printf("exception: 0x%x\n"
