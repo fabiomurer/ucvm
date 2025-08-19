@@ -39,6 +39,8 @@ struct kvm_regs *vm_get_regs(struct vm *vm);
 
 struct kvm_sregs *vm_get_sregs(struct vm *vm);
 
+struct kvm_vcpu_events *vm_get_vcpu_events(struct vm *vm);
+
 void vm_set_regs(struct vm *vm);
 
 void vm_set_sregs(struct vm *vm);

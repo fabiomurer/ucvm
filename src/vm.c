@@ -24,7 +24,7 @@ void vm_run_enable_sync_regs(struct vm *vm)
 	// For x86, the ‘kvm_valid_regs’ field of struct kvm_run is overloaded to
 	// function as an input bit-array field set by userspace to indicate the
 	// specific register sets to be copied out on the next exit.
-	vm->run->kvm_valid_regs = KVM_SYNC_X86_REGS | KVM_SYNC_X86_SREGS;
+	vm->run->kvm_valid_regs = KVM_SYNC_X86_REGS | KVM_SYNC_X86_SREGS | KVM_SYNC_X86_EVENTS;
 }
 
 struct kvm_regs *vm_get_regs(struct vm *vm)
@@ -43,6 +43,15 @@ struct kvm_sregs *vm_get_sregs(struct vm *vm)
 	}
 
 	return &vm->run->s.regs.sregs;
+}
+
+struct kvm_vcpu_events *vm_get_vcpu_events(struct vm *vm)
+{
+	if ((vm->run->kvm_valid_regs & KVM_SYNC_X86_EVENTS) == 0) {
+		PANIC("EVENTS not valid");
+	}
+
+	return &vm->run->s.regs.events;
 }
 
 void vm_set_regs(struct vm *vm)
@@ -76,6 +85,11 @@ struct vm vm_create(void)
 		PANIC("KVM API version not supported");
 	}
 
+	int support_exception_payload = ioctl(vm.kvmfd, KVM_CHECK_EXTENSION, KVM_CAP_EXCEPTION_PAYLOAD);
+	if (support_exception_payload <= 0) {
+		PANIC("KVM_CAP_EXCEPTION_PAYLOAD not supported");
+	}
+
 	int supported_sync_regs = ioctl(vm.kvmfd, KVM_CHECK_EXTENSION, KVM_CAP_SYNC_REGS);
 	if (supported_sync_regs != KVM_SYNC_X86_VALID_FIELDS) {
 		PANIC("KVM_CAP_SYNC_REGS not supported");
@@ -84,6 +98,14 @@ struct vm vm_create(void)
 	// create a vm
 	if ((vm.vmfd = ioctl(vm.kvmfd, KVM_CREATE_VM, 0)) < 0) {
 		PANIC_PERROR("KVM_CREATE_VM");
+	}
+
+	struct kvm_enable_cap exception_payload_enabled = {
+		.cap = KVM_CAP_EXCEPTION_PAYLOAD,
+		.args[0] = 1,
+	};
+	if (ioctl(vm.vmfd, KVM_ENABLE_CAP, &exception_payload_enabled) < 0) {
+		PANIC("KVM_CAP_EXCEPTION_PAYLOAD");
 	}
 
 	// create vcpu
@@ -637,14 +659,12 @@ void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 	}
 }
 
+#define EXCEPTION_UD 0x6
+#define EXCEPTION_PF 0xE
+
 void vm_exit_handler(int exit_code, struct vm *vm)
 {
-	//vcpu_events_logs(vm);
 	switch (exit_code) {
-	case KVM_EXIT_EXCEPTION:
-		printf("URRA exception!!\n");
-		exit(0);
-		break;
 	case KVM_EXIT_DEBUG:
 		printf("KVM_EXIT_DEBUG\n");
 		printf("exception: 0x%x\n"
@@ -662,33 +682,41 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 	case KVM_EXIT_SHUTDOWN:
 		struct kvm_regs *regs = vm_get_regs(vm);
 		struct kvm_sregs *sregs = vm_get_sregs(vm);
+		struct kvm_vcpu_events *events = vm_get_vcpu_events(vm);
 
-		// page fault
-		if (sregs->cr2 != 0) {
+		switch (events->exception.nr) {
+			case EXCEPTION_UD:
+				if (is_syscall(vm, regs)) {
+					if (syscall_handler(vm, regs) == ENOSYS) {
+						vcpu_logs_exit(vm, EXIT_FAILURE);
+					}
+
+					// skip syscall instruction
+					regs->rip += SYSCALL_OP_SIZE;
+					vm_set_regs(vm);
+				} else {
+					printf("undefined opcode");
+					vcpu_logs_exit(vm, EXIT_FAILURE);
+				}
+				break;
+			
+			case EXCEPTION_PF:
 #if DEBUG
-			printf("page fault addr: %p, inst: %p\n", (void *)sregs->cr2,
+				printf("page fault addr: %p, inst: %p\n", (void *)sregs->cr2,
 			       (void *)regs->rip);
 #endif
-			vm_page_fault_handler(vm, sregs->cr2);
+				vm_page_fault_handler(vm, sregs->cr2);
 
-			sregs->cr2 = 0;
-			vm_set_sregs(vm);
-		} else if (is_syscall(vm, regs)) {
-			if (syscall_handler(vm, regs) == ENOSYS) {
-				vcpu_events_logs(vm);
-				vcpu_regs_log(vm);
-				exit(-1);
+				sregs->cr2 = 0;
+				vm_set_sregs(vm);
+
+				break;
+			
+			default:
+				printf("unespected shutdown\n");
+				vcpu_logs_exit(vm, EXIT_FAILURE);
+				break;
 			}
-
-			// skip syscall instruction
-			regs->rip += SYSCALL_OP_SIZE;
-			vm_set_regs(vm);
-		} else {
-			printf("unespected shutdown\n");
-			vcpu_events_logs(vm);
-			vcpu_regs_log(vm);
-			exit(-1);
-		}
 		break;
 	case KVM_EXIT_FAIL_ENTRY:
 		printf("KVM_EXIT_FAIL_ENTRY: 0x%lx\n",

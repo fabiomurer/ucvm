@@ -1,3 +1,4 @@
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <sys/ioctl.h>
@@ -41,12 +42,7 @@ char exceptions_names[][30] = { "divide error",
 
 void vcpu_events_logs(struct vm *vm)
 {
-	struct kvm_vcpu_events events;
-
-	if (ioctl(vm->vcpufd, KVM_GET_VCPU_EVENTS, &events) < 0) {
-		perror("KVM_GET_VCPU_EVENTS");
-		exit(-1);
-	}
+	struct kvm_vcpu_events* events = vm_get_vcpu_events(vm);
 
 	printf("exceptions:\n\t"
 	       "injected: %d\n\t"
@@ -56,30 +52,30 @@ void vcpu_events_logs(struct vm *vm)
 	       "error_code: %d\n\t"
 	       "exception_has_payload: %d\n\t"
 	       "exception_payload: %p\n",
-	       events.exception.injected, events.exception.nr,
-	       exceptions_names[events.exception.nr], events.exception.has_error_code,
-	       events.exception.pending, events.exception.error_code, events.exception_has_payload,
-	       (void *)events.exception_payload);
+	       events->exception.injected, events->exception.nr,
+	       exceptions_names[events->exception.nr], events->exception.has_error_code,
+	       events->exception.pending, events->exception.error_code, events->exception_has_payload,
+	       (void *)events->exception_payload);
 
-	printf("sipi_vector: %d\n", events.sipi_vector);
+	printf("sipi_vector: %d\n", events->sipi_vector);
 
-	printf("flags: %X\n", events.flags);
-	if (events.flags & KVM_VCPUEVENT_VALID_NMI_PENDING) {
+	printf("flags: %X\n", events->flags);
+	if (events->flags & KVM_VCPUEVENT_VALID_NMI_PENDING) {
 		printf("\tKVM_VCPUEVENT_VALID_NMI_PENDING\n");
 	}
-	if (events.flags & KVM_VCPUEVENT_VALID_SIPI_VECTOR) {
+	if (events->flags & KVM_VCPUEVENT_VALID_SIPI_VECTOR) {
 		printf("\tKVM_VCPUEVENT_VALID_SIPI_VECTOR\n");
 	}
-	if (events.flags & KVM_VCPUEVENT_VALID_SHADOW) {
+	if (events->flags & KVM_VCPUEVENT_VALID_SHADOW) {
 		printf("\tKVM_VCPUEVENT_VALID_SHADOW\n");
 	}
-	if (events.flags & KVM_VCPUEVENT_VALID_SMM) {
+	if (events->flags & KVM_VCPUEVENT_VALID_SMM) {
 		printf("\tKVM_VCPUEVENT_VALID_SMM\n");
 	}
-	if (events.flags & KVM_VCPUEVENT_VALID_PAYLOAD) {
+	if (events->flags & KVM_VCPUEVENT_VALID_PAYLOAD) {
 		printf("\tKVM_VCPUEVENT_VALID_PAYLOAD\n");
 	}
-	if (events.flags & KVM_VCPUEVENT_VALID_TRIPLE_FAULT) {
+	if (events->flags & KVM_VCPUEVENT_VALID_TRIPLE_FAULT) {
 		printf("\tKVM_VCPUEVENT_VALID_TRIPLE_FAULT\n");
 	}
 
@@ -88,27 +84,27 @@ void vcpu_events_logs(struct vm *vm)
 	       "nr: %d\n\t"
 	       "soft: %d\n\t"
 	       "shadow: %d\n",
-	       events.interrupt.injected, events.interrupt.nr, events.interrupt.soft,
-	       events.interrupt.shadow);
+	       events->interrupt.injected, events->interrupt.nr, events->interrupt.soft,
+	       events->interrupt.shadow);
 
 	printf("nmi:\n\t"
 	       "injected: %d\n\t"
 	       "pending: %d\n\t"
 	       "masked: %d\n\t"
 	       "pad: %d\n",
-	       events.nmi.injected, events.nmi.pending, events.nmi.masked, events.nmi.pad);
+	       events->nmi.injected, events->nmi.pending, events->nmi.masked, events->nmi.pad);
 
 	printf("smi:\n\t"
 	       "smm: %d\n\t"
 	       "pending: %d\n\t"
 	       "smm_inside_nmi: %d\n\t"
 	       "latched_init: %d\n",
-	       events.smi.smm, events.smi.pending, events.smi.smm_inside_nmi,
-	       events.smi.latched_init);
+	       events->smi.smm, events->smi.pending, events->smi.smm_inside_nmi,
+	       events->smi.latched_init);
 
 	printf("triple fault:\n\t"
 	       "pending: %d\n",
-	       events.triple_fault.pending);
+	       events->triple_fault.pending);
 }
 
 void vcpu_regs_log(struct vm *vm)
@@ -134,4 +130,11 @@ void vcpu_regs_log(struct vm *vm)
 
 		printf("\n");
 	}
+}
+
+void vcpu_logs_exit(struct vm *vm, int exit_status)
+{
+	vcpu_events_logs(vm);
+	vcpu_regs_log(vm);
+	exit(exit_status);
 }
