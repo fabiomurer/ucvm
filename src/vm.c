@@ -16,6 +16,8 @@
 #include "vmm.h"
 #include "vsyscall.h"
 #include "guest_inspector.h"
+#include "gdt.h"
+#include "idt.h"
 
 #define KVM_DEVICE "/dev/kvm"
 
@@ -488,6 +490,56 @@ void cpu_init_cache(struct kvm_sregs2 *sregs)
 	*/
 }
 
+#define CRO_PROTECTED_MODE (1ULL << 0)
+#define CR0_ENABLE_PAGING (1ULL << 31)
+#define CR4_ENABLE_PAE (1ULL << 5)
+#define CR4_ENABLE_PGE (1ULL << 7)
+
+/*
+bit 10
+
+Description: Indicates whether long mode is active. This bit is read-only and is
+set by the processor when entering long mode.
+- Values:
+    - 0: Long mode is not active
+    - 1: Long mode is active
+*/
+#define EFER_LONG_MODE_ENABLED (1ULL << 8)
+#define EFER_LONG_MODE_ACTIVE (1ULL << 10)
+
+/*
+bit 11
+
+Description: Enables the no-execute page protection feature, which prevents code
+execution from data pages.
+
+- Values:
+    -0: No-execute page protection is disabled
+    - 1: No-execute page protection is enabled
+*/
+#define EFER_NO_EXECUTE_ENABLE (1ULL << 11)
+
+void cpu_init_long(struct kvm_sregs2 *sregs, struct vmm *vmm) {
+	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
+	sregs->cr3 = (uint64_t)vmm->pml4t_addr.guest_physical_addr;
+	sregs->cr4 |= CR4_ENABLE_PAE | CR4_ENABLE_PGE;
+	sregs->efer |= EFER_LONG_MODE_ENABLED | EFER_LONG_MODE_ACTIVE; // EFER_LONG_MODE_ENABLED??
+
+	// initialize segments for long mode
+	// code segment
+	sregs->cs = gdt_code_segment;
+	// data segment
+	sregs->ds = gdt_data_segment;
+	// stack segment
+	sregs->ss = gdt_data_segment;
+	// additional data and string operation
+	sregs->es = gdt_data_segment;
+	// thread-specific data structures
+	sregs->fs = gdt_data_segment;
+	// thread-specific data structures
+	sregs->gs = gdt_data_segment;
+}
+
 void vm_init(struct vm *vm)
 {
 	cpu_init_cpuid(vm);
@@ -512,8 +564,11 @@ void vm_init(struct vm *vm)
 		PANIC_PERROR("KVM_GET_XCRS");
 	}
 
-	cpu_init_long(&sregs, &vm->vmm);
 
+	vmm_init(&vm->vmm);
+	gdt_init(&sregs, &vm->vmm);
+	idt_init(&sregs, &vm->vmm);
+	cpu_init_long(&sregs, &vm->vmm);
 	cpu_init_cache(&sregs);
 
 	// TODO: make it better
@@ -650,7 +705,7 @@ bool is_syscall(struct vm *vm, struct kvm_regs *regs)
 void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 {
 	uint64_t missing_page_addr = TRUNC_PG(cr2);
-	uintptr_t guest_vaddr = map_page(&vm->vmm, missing_page_addr);
+	uintptr_t guest_vaddr = vmm_map_page(&vm->vmm, missing_page_addr);
 
 	if (linux_view_read_mem(&vm->linux_view, (off64_t)missing_page_addr, (void *)guest_vaddr,
 				PAGE_SIZE) != 0) {

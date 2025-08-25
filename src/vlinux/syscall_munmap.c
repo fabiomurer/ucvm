@@ -8,7 +8,7 @@ uint64_t syscall_munmap(struct linux_view *linux_view, struct vmm *vmm, uint64_t
 
 	// unmap in the guest
 	if (ret == 0) { // successful unmap
-		unmap_range(vmm, addr, len);
+		vmm_unmap_range(vmm, addr, len);
 	}
 
 	return ret;
