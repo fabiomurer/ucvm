@@ -9,7 +9,7 @@
 
 int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool resolve_pf)
 {
-	*host_addr = host_virtual_addr_to_guest_physical_addr(guest_addr);
+	*host_addr = host_virtual_addr_to_guest_physical_addr(&vm->vmm, guest_addr);
 
 	// first try
 	if (*host_addr == nullptr) {
@@ -20,7 +20,7 @@ int vm_guest_to_host(struct vm *vm, u_int64_t guest_addr, void **host_addr, bool
 		vm_page_fault_handler(vm, guest_addr);
 
 		// second try
-		*host_addr = host_virtual_addr_to_guest_physical_addr(guest_addr);
+		*host_addr = host_virtual_addr_to_guest_physical_addr(&vm->vmm, guest_addr);
 
 		if (*host_addr == nullptr) {
 			return -1;

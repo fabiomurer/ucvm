@@ -5,9 +5,6 @@
 #include "utils.h"
 #include <sys/user.h>
 
-static void *guest_memory;
-static struct frame pml4t_addr;
-
 #define GDTENTRY_SIZE 8
 #define IDTENTRY_SIZE 8
 
@@ -149,11 +146,11 @@ size_t guest_physical_addr_to_pfn(uint64_t guest_physical_addr)
 	return (guest_physical_addr - GUEST_PHYS_ADDR) / PAGE_SIZE;
 }
 
-void free_frames_list_init(void)
+void free_frames_list_init(void* mem_host_virtual_addr)
 {
 	for (size_t i = 0; i < PAGE_NUMBER; i++) {
 		frames_pool[i].pfn = i;
-		frames_pool[i].host_virtual_addr = (uint64_t)guest_memory + (i * PAGE_SIZE);
+		frames_pool[i].host_virtual_addr = (uint64_t)mem_host_virtual_addr + (i * PAGE_SIZE);
 		frames_pool[i].guest_physical_addr = (uint64_t)GUEST_PHYS_ADDR + (i * PAGE_SIZE);
 
 		dlist_init(&frames_pool[i].list);
@@ -245,14 +242,13 @@ execution from data pages.
 */
 #define EFER_NO_EXECUTE_ENABLE (1ULL << 11)
 
-void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
+void cpu_init_long(struct kvm_sregs2 *sregs, struct vmm *vmm)
 {
-	guest_memory = memory;
 
-	free_frames_list_init();
+	free_frames_list_init(vmm->mem_host_virtual_addr);
 
 	// allocate one page for the pml4
-	if (get_free_frame(&pml4t_addr) != 0) {
+	if (get_free_frame(&vmm->pml4t_addr) != 0) {
 		PANIC("get_free_frame");
 	}
 	
@@ -322,7 +318,7 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 		PANIC("get_free_frame");
 	}
 
-	map_addr(mem_idt.guest_physical_addr, mem_idt.guest_physical_addr);
+	map_addr(vmm, mem_idt.guest_physical_addr, mem_idt.guest_physical_addr);
 	struct idt_entry *idt = (struct idt_entry *)mem_idt.host_virtual_addr;
 
 	// Set up a template for a non-present interrupt gate.
@@ -344,7 +340,7 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 	
 
 	sregs->cr0 |= CRO_PROTECTED_MODE | CR0_ENABLE_PAGING;
-	sregs->cr3 = (uint64_t)pml4t_addr.guest_physical_addr;
+	sregs->cr3 = (uint64_t)vmm->pml4t_addr.guest_physical_addr;
 	sregs->cr4 |= CR4_ENABLE_PAE | CR4_ENABLE_PGE;
 	sregs->efer |= EFER_LONG_MODE_ENABLED | EFER_LONG_MODE_ACTIVE; // EFER_LONG_MODE_ENABLED??
 
@@ -386,13 +382,13 @@ void cpu_init_long(struct kvm_sregs2 *sregs, void *memory)
 
 #define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB) // | PAGE_USER
 // ?
-struct frame jump_next_frame(uint64_t gaddr)
+struct frame jump_next_frame(uint64_t gaddr, void* mem_host_virtual_addr)
 {
 	// rounds gaddr down to the nearest multiple of PAGE_SIZE
 	gaddr = (gaddr / PAGE_SIZE) * PAGE_SIZE;
 	struct frame frame = {
 		.guest_physical_addr = gaddr,
-		.host_virtual_addr = (uint64_t)guest_memory + (gaddr - GUEST_PHYS_ADDR),
+		.host_virtual_addr = (uint64_t)mem_host_virtual_addr + (gaddr - GUEST_PHYS_ADDR),
 	};
 
 	return frame;
@@ -489,12 +485,12 @@ uint64_t get_phys_addr_from_pt_row(uint64_t pt_row)
 
 #define NULL_PT_ROW 0ULL
 
-void *host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
+void *host_virtual_addr_to_guest_physical_addr(struct vmm *vmm, uint64_t vaddr)
 {
 	uint64_t offset = vaddr % PAGE_SIZE;
 	uint64_t indexes_array[PAGE_TABLE_LEVELS] = { 0 };
 	get_indexes_array(vaddr, indexes_array);
-	struct frame *current_pt_table = &pml4t_addr;
+	struct frame *current_pt_table = &vmm->pml4t_addr;
 
 	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
 		uint64_t current_pt_row = *(uint64_t *)(current_pt_table->host_virtual_addr +
@@ -523,7 +519,7 @@ void *host_virtual_addr_to_guest_physical_addr(uint64_t vaddr)
 	return nullptr;
 }
 
-void map_addr(uint64_t vaddr, uint64_t phys_addr)
+void map_addr(struct vmm *vmm, uint64_t vaddr, uint64_t phys_addr)
 {
 #ifdef DEBUG
 	printf("Mapping %lx to %lx\n", vaddr, phys_addr);
@@ -536,7 +532,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 
 	uint64_t indexes_array[PAGE_TABLE_LEVELS] = { 0 };
 	get_indexes_array(vaddr, indexes_array);
-	struct frame *current_pt_table = &pml4t_addr;
+	struct frame *current_pt_table = &vmm->pml4t_addr;
 
 	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
 		uint64_t *current_pt_row = (uint64_t *)(current_pt_table->host_virtual_addr +
@@ -568,7 +564,7 @@ void map_addr(uint64_t vaddr, uint64_t phys_addr)
 	}
 }
 
-uintptr_t map_page(uint64_t vaddr)
+uintptr_t map_page(struct vmm *vmm, uint64_t vaddr)
 {
 	struct frame frame = { 0 };
 	int err = get_free_frame(&frame);
@@ -576,11 +572,11 @@ uintptr_t map_page(uint64_t vaddr)
 		PANIC("get_free_frame");
 	}
 
-	map_addr(vaddr, frame.guest_physical_addr);
+	map_addr(vmm, vaddr, frame.guest_physical_addr);
 	return frame.host_virtual_addr;
 }
 
-int unmap_addr(uint64_t vaddr)
+int unmap_addr(struct vmm *vmm, uint64_t vaddr)
 {
 	if (vaddr % PAGE_SIZE != 0) {
 		PANIC("ALIGMENT PROBLEMS");
@@ -588,7 +584,7 @@ int unmap_addr(uint64_t vaddr)
 
 	uint64_t indexes_array[PAGE_TABLE_LEVELS] = { 0 };
 	get_indexes_array(vaddr, indexes_array);
-	struct frame *current_pt_table = &pml4t_addr;
+	struct frame *current_pt_table = &vmm->pml4t_addr;
 
 	for (int level = 0; level < PAGE_TABLE_LEVELS; level++) {
 		uint64_t *current_pt_row = (uint64_t *)(current_pt_table->host_virtual_addr +
@@ -623,7 +619,7 @@ int unmap_addr(uint64_t vaddr)
 }
 
 // TODO: make more performant by unmapping only the mapped pages
-void unmap_range(uint64_t vaddr_start, size_t size)
+void unmap_range(struct vmm *vmm, uint64_t vaddr_start, size_t size)
 {
 	if (size == 0) {
 		return;
@@ -638,7 +634,7 @@ void unmap_range(uint64_t vaddr_start, size_t size)
 
 	// Iterate through pages in the range
 	while (vaddr < vaddr_end) {
-		unmap_addr(vaddr); // can fail
+		unmap_addr(vmm, vaddr); // can fail
 		vaddr += PAGE_SIZE;
 	}
 

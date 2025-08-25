@@ -136,18 +136,17 @@ struct vm vm_create(void)
 	}
 
 	// create memory
-	if ((vm.memory = mmap(NULL, MEMORY_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
+	if ((vm.vmm.mem_host_virtual_addr = mmap(NULL, MEMORY_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS,
 			      -1, 0)) == MAP_FAILED) {
 		PANIC_PERROR("MMAP");
 	}
-	memset(vm.memory, 0, MEMORY_SIZE); // ?
-
+	memset(vm.vmm.mem_host_virtual_addr, 0, MEMORY_SIZE); // ?
 	struct kvm_userspace_memory_region region = {
 		.slot = MEMORY_SLOT,
 		.flags = 0,
 		.guest_phys_addr = GUEST_PHYS_ADDR,
 		.memory_size = MEMORY_SIZE,
-		.userspace_addr = (uint64_t)vm.memory,
+		.userspace_addr = (uint64_t)vm.vmm.mem_host_virtual_addr,
 	};
 
 	if (ioctl(vm.vmfd, KVM_SET_USER_MEMORY_REGION, &region) < 0) {
@@ -513,7 +512,7 @@ void vm_init(struct vm *vm)
 		PANIC_PERROR("KVM_GET_XCRS");
 	}
 
-	cpu_init_long(&sregs, vm->memory);
+	cpu_init_long(&sregs, &vm->vmm);
 
 	cpu_init_cache(&sregs);
 
@@ -651,7 +650,7 @@ bool is_syscall(struct vm *vm, struct kvm_regs *regs)
 void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 {
 	uint64_t missing_page_addr = TRUNC_PG(cr2);
-	uintptr_t guest_vaddr = map_page(missing_page_addr);
+	uintptr_t guest_vaddr = map_page(&vm->vmm, missing_page_addr);
 
 	if (linux_view_read_mem(&vm->linux_view, (off64_t)missing_page_addr, (void *)guest_vaddr,
 				PAGE_SIZE) != 0) {

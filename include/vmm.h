@@ -25,14 +25,19 @@ struct frame {
 	struct dlist_head list;
 };
 
-void *host_virtual_addr_to_guest_physical_addr(uint64_t vaddr);
+struct vmm {
+	void* mem_host_virtual_addr;
+	struct frame pml4t_addr;
+};
 
-void map_addr(uint64_t vaddr, uint64_t phys_addr);
+void *host_virtual_addr_to_guest_physical_addr(struct vmm *vmm, uint64_t vaddr);
 
-uintptr_t map_page(uint64_t vaddr);
+void map_addr(struct vmm *vmm, uint64_t vaddr, uint64_t phys_addr);
 
-int unmap_addr(uint64_t vaddr);
+uintptr_t map_page(struct vmm *vmm, uint64_t vaddr);
 
-void unmap_range(uint64_t vaddr_start, size_t size);
+int unmap_addr(struct vmm *vmm, uint64_t vaddr);
 
-void cpu_init_long(struct kvm_sregs2 *sregs, void *memory);
+void unmap_range(struct vmm *vmm, uint64_t vaddr_start, size_t size);
+
+void cpu_init_long(struct kvm_sregs2 *sregs, struct vmm *vmm);

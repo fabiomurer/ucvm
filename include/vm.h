@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "view_linux.h"
+#include "vmm.h"
 
 struct vm {
 	int kvmfd;
@@ -11,7 +12,8 @@ struct vm {
 	int vcpufd;
 	struct kvm_cpuid2 *vcpu_cpuid;
 	struct kvm_run *run;
-	void *memory;
+	
+	struct vmm vmm;
 
 	struct linux_view linux_view;
 

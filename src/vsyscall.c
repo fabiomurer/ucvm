@@ -128,7 +128,7 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			uint64_t addr = arg1;
 			uint64_t len = arg2;
 
-			ret = syscall_munmap(&vm->linux_view, addr, len);
+			ret = syscall_munmap(&vm->linux_view, &vm->vmm, addr, len);
 		}
 		break;
 
