@@ -8,4 +8,4 @@ struct virtual_file {
 	const char *content;
 };
 
-const char *handle_virtual_files(char *filename);
+int handle_virtual_file(const char *filename);

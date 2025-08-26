@@ -13,10 +13,9 @@ uint64_t syscall_open(struct vm *vm, uint64_t filename, int flags, mode_t mode)
 		PANIC("read_string_host");
 	}
 
-	const char *vfile = handle_virtual_files(tmp_filename);
-	if (vfile != nullptr) {
-		// is a virtual file
-		return open(vfile, flags, mode);
+	int vfd = handle_virtual_file(tmp_filename);
+	if (vfd != -1) {
+		return vfd;
 	}
 
 	return open(tmp_filename, flags, mode);
