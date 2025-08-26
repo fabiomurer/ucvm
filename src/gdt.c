@@ -79,9 +79,6 @@ struct gdt_entry {
 	uint64_t limit1: 4, avl: 1, l: 1, d: 1, g: 1, base2: 8;
 } __attribute__((packed));
 
-struct kvm_segment gdt_code_segment;
-struct kvm_segment gdt_data_segment;
-
 const struct gdt_entry CODE_SEG = {
 	.limit0 = 0xFFFF,
 	.base0 = 0,
@@ -137,10 +134,6 @@ struct kvm_segment gdt_seg_from_desc(struct gdt_entry e, uint32_t idx)
 
 void gdt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
 {
-	// create kvm segments
-	gdt_code_segment = gdt_seg_from_desc(CODE_SEG, 1);
-	gdt_data_segment = gdt_seg_from_desc(DATA_SEG, 2);
-
     // alloc one page for GDT
 	struct frame mem_gdt = { 0 };
 	if (vmm_get_free_frame(vmm, &mem_gdt) != 0) {
@@ -161,4 +154,16 @@ void gdt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
 	sregs->gdt.base = mem_gdt.guest_physical_addr;
 	// size of the table (2 entry, 1 null)
 	sregs->gdt.limit = (3 * sizeof(struct gdt_entry)) - 1;
+}
+
+struct kvm_segment gdt_get_segment(int idx)
+{
+	switch (idx) {
+		case GDT_IDX_CODE: 
+			return gdt_seg_from_desc(CODE_SEG, GDT_IDX_CODE);
+		case GDT_IDX_DATA:
+			return gdt_seg_from_desc(DATA_SEG, GDT_IDX_DATA);
+		default:
+			PANIC("segment idx not valid");
+	}
 }

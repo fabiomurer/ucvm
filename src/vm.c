@@ -1,3 +1,4 @@
+#include <asm/kvm.h>
 #define _GNU_SOURCE
 
 #include <linux/kvm.h>
@@ -527,6 +528,9 @@ void cpu_init_long(struct kvm_sregs2 *sregs, struct vmm *vmm) {
 
 	// initialize segments for long mode
 	// code segment
+	struct kvm_segment gdt_code_segment = gdt_get_segment(GDT_IDX_CODE);
+	struct kvm_segment gdt_data_segment = gdt_get_segment(GDT_IDX_DATA);
+
 	sregs->cs = gdt_code_segment;
 	// data segment
 	sregs->ds = gdt_data_segment;

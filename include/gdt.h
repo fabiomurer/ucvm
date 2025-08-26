@@ -3,9 +3,13 @@
 #include <stdint.h>
 #include "vmm.h"
 
-extern struct kvm_segment gdt_code_segment;
-extern struct kvm_segment gdt_data_segment;
+enum {
+    GDT_IDX_CODE = 1,
+    GDT_IDX_DATA = 2,
+};
 
 void gdt_init(struct kvm_sregs2 *sregs, struct vmm *vmm);
+
+struct kvm_segment gdt_get_segment(int idx);
 
 

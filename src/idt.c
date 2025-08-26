@@ -38,7 +38,7 @@ void idt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
     // Set up a template for a non-present interrupt gate.
 	// Any attempt to use this gate will cause a #NP fault (Not Present)
 	struct idt_entry entry = { 0 };
-	entry.selector = gdt_code_segment.selector;
+	entry.selector = gdt_get_segment(GDT_IDX_CODE).selector;
 	entry.type = IDTENTRY_TYPE_INTERRUPT;
     entry.dpl = 0;
     entry.p = 0;
