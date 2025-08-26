@@ -1,4 +1,3 @@
-#include "cpu.h"
 #define _GNU_SOURCE
 
 #include <linux/kvm.h>
@@ -17,6 +16,7 @@
 #include "vmm.h"
 #include "vsyscall.h"
 #include "guest_inspector.h"
+#include "cpu.h"
 
 #define KVM_DEVICE "/dev/kvm"
 
@@ -159,9 +159,56 @@ struct vm vm_create(void)
 	return vm;
 }
 
+void vm_init_cpuid(struct vm *vm)
+{
+	free(vm->vcpu_cpuid);
+	int max_entries = 100;
+
+	vm->vcpu_cpuid = calloc(1, sizeof(*vm->vcpu_cpuid) +
+					   (max_entries * sizeof(*vm->vcpu_cpuid->entries)));
+	vm->vcpu_cpuid->nent = max_entries;
+
+	if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, vm->vcpu_cpuid) < 0) {
+		PANIC_PERROR("KVM_GET_SUPPORTED_CPUID");
+	}
+
+	/*
+	x2APIC (CPUID leaf 1, ecx[21) and TSC deadline timer (CPUID leaf 1, ecx
+	[24]) may be returned as true, but they depend on KVM_CREATE_IRQCHIP for
+	in-kernel emulation of the local APIC.
+	=> disable those bits
+	*/
+	for (uint32_t i = 0; i < vm->vcpu_cpuid->nent; i++) {
+		/*
+	function:
+	    the eax value used to obtain the entry
+	index:
+	    the ecx value used to obtain the entry (for entries that are affected by ecx)
+	flags:
+	    an OR of zero or more of the following:
+			KVM_CPUID_FLAG_SIGNIFCANT_INDEX: if the index field is valid
+	    eax, ebx, ecx, edx:
+		the values returned by the cpuid instruction for this function/index combination
+		*/
+		struct kvm_cpuid_entry2 *entry = &vm->vcpu_cpuid->entries[i];
+		if (entry->function == 1 && entry->index == 0) {
+			// clearing x2APIC bit
+			entry->ecx &= ~(1 << 21);
+			// clearing TSC bit
+			entry->ecx &= ~(1 << 24);
+			break;
+		}
+	}
+
+	if (ioctl(vm->vcpufd, KVM_SET_CPUID2, vm->vcpu_cpuid) < 0) {
+		PANIC_PERROR("KVM_SET_CPUID2");
+	}
+}
+
 void vm_init(struct vm *vm)
 {
-	cpu_init(vm);
+	vm_init_cpuid(vm);
+	cpu_init(vm->vcpufd, vm->vcpu_cpuid, &vm->vmm);
 }
 
 void vm_set_debug(struct vm *vm, bool enable_debug)

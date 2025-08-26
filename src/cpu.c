@@ -1,3 +1,4 @@
+#include <asm/kvm.h>
 #define _GNU_SOURCE
 
 #include <stdint.h>
@@ -172,52 +173,6 @@ microarchitecture_level cpu_microarchitecture_levels(struct kvm_cpuid2 *cpuid)
 	return x86_64_unknown;
 }
 
-void cpu_init_cpuid(struct vm *vm)
-{
-	free(vm->vcpu_cpuid);
-	int max_entries = 100;
-
-	vm->vcpu_cpuid = calloc(1, sizeof(*vm->vcpu_cpuid) +
-					   (max_entries * sizeof(*vm->vcpu_cpuid->entries)));
-	vm->vcpu_cpuid->nent = max_entries;
-
-	if (ioctl(vm->kvmfd, KVM_GET_SUPPORTED_CPUID, vm->vcpu_cpuid) < 0) {
-		PANIC_PERROR("KVM_GET_SUPPORTED_CPUID");
-	}
-
-	/*
-	x2APIC (CPUID leaf 1, ecx[21) and TSC deadline timer (CPUID leaf 1, ecx
-	[24]) may be returned as true, but they depend on KVM_CREATE_IRQCHIP for
-	in-kernel emulation of the local APIC.
-	=> disable those bits
-	*/
-	for (uint32_t i = 0; i < vm->vcpu_cpuid->nent; i++) {
-		/*
-	function:
-	    the eax value used to obtain the entry
-	index:
-	    the ecx value used to obtain the entry (for entries that are affected by ecx)
-	flags:
-	    an OR of zero or more of the following:
-			KVM_CPUID_FLAG_SIGNIFCANT_INDEX: if the index field is valid
-	    eax, ebx, ecx, edx:
-		the values returned by the cpuid instruction for this function/index combination
-		*/
-		struct kvm_cpuid_entry2 *entry = &vm->vcpu_cpuid->entries[i];
-		if (entry->function == 1 && entry->index == 0) {
-			// clearing x2APIC bit
-			entry->ecx &= ~(1 << 21);
-			// clearing TSC bit
-			entry->ecx &= ~(1 << 24);
-			break;
-		}
-	}
-
-	if (ioctl(vm->vcpufd, KVM_SET_CPUID2, vm->vcpu_cpuid) < 0) {
-		PANIC_PERROR("KVM_SET_CPUID2");
-	}
-}
-
 void cpu_init_sse(struct kvm_sregs2 *sregs)
 {
 #define CR4_OSFXSR (1ULL << 9)
@@ -248,19 +203,19 @@ void cpu_init_fpu(struct kvm_fpu *fpu)
 	*/
 
 // x87 FPU Control Word Flags
-#define FCW_IM (1 << 0)	 // Invalid Operation Mask
-#define FCW_DM (1 << 1)	 // Denormalized Operand Mask
-#define FCW_ZM (1 << 2)	 // Zero Divide Mask
-#define FCW_OM (1 << 3)	 // Overflow Mask
-#define FCW_UM (1 << 4)	 // Underflow Mask
-#define FCW_PM (1 << 5)	 // Precision Mask
-#define FCW_PC (3 << 8)	 // Precision Control (11b = Double Precision)
-#define FCW_RC (0 << 10) // Rounding Control (00b = Round to Nearest)
-#define FCW_X (0 << 12)	 // Infinity Control (obsolete, always zero)
+#define FCW_IM  (1 << 0)  // Invalid Operation Mask
+#define FCW_DM  (1 << 1)  // Denormalized Operand Mask
+#define FCW_ZM  (1 << 2)  // Zero Divide Mask
+#define FCW_OM  (1 << 3)  // Overflow Mask
+#define FCW_UM  (1 << 4)  // Underflow Mask
+#define FCW_PM  (1 << 5)  // Precision Mask
+#define FCW_PC  (3 << 8)  // Precision Control (11b = Double Precision)
+#define FCW_RC  (0 << 10) // Rounding Control (00b = Round to Nearest)
+#define FCW_X   (0 << 12) // Infinity Control (obsolete, always zero)
 
 // x87 FPU Tag Word (8x2 bits, one per register)
 // 0b11 (0x3) = Empty, 0b00 = Valid, 0b01 = Zero, 0b10 = Special
-#define FTWX_ALL_EMPTY 0xFF // All 8 registers empty (2 bits per reg, all set)
+#define FTWX_ALL_EMPTY 0xFF  // All 8 registers empty (2 bits per reg, all set)
 
 // MXCSR Exception Masks
 #define MXCSR_PM (1UL << 12)
@@ -270,9 +225,15 @@ void cpu_init_fpu(struct kvm_fpu *fpu)
 #define MXCSR_DM (1UL << 8)
 #define MXCSR_IM (1UL << 7)
 
-	fpu->fcw = FCW_IM | FCW_DM | FCW_ZM | FCW_OM | FCW_UM | FCW_PM | FCW_PC | FCW_RC | FCW_X;
+	fpu->fcw  = FCW_IM | FCW_DM | FCW_ZM | FCW_OM |
+                FCW_UM | FCW_PM | FCW_PC | FCW_RC | FCW_X;
 	fpu->ftwx = FTWX_ALL_EMPTY;
-	fpu->mxcsr = MXCSR_PM | MXCSR_UM | MXCSR_OM | MXCSR_ZM | MXCSR_DM | MXCSR_IM;
+	fpu->mxcsr = MXCSR_PM |
+		MXCSR_UM |
+		MXCSR_OM |
+		MXCSR_ZM |
+		MXCSR_DM |
+		MXCSR_IM;
 }
 
 void cpu_init_avx(struct kvm_sregs2 *sregs, struct kvm_xcrs *xrcs)
@@ -419,34 +380,33 @@ execution from data pages.
 	sregs->gs = gdt_data_segment;
 }
 
-void cpu_init(struct vm *vm)
+void cpu_init(int vcpufd, struct kvm_cpuid2* vcpu_cpuid, struct vmm *vmm)
 {
-	cpu_init_cpuid(vm);
 
-	microarchitecture_level vcpulevel = cpu_microarchitecture_levels(vm->vcpu_cpuid);
+	microarchitecture_level vcpulevel = cpu_microarchitecture_levels(vcpu_cpuid);
 
 	struct kvm_regs regs;
 	struct kvm_sregs2 sregs;
 	struct kvm_fpu fpu;
 	struct kvm_xcrs xcrs;
 
-	if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
+	if (ioctl(vcpufd, KVM_GET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_GET_REGS");
 	}
-	if (ioctl(vm->vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
+	if (ioctl(vcpufd, KVM_GET_SREGS2, &sregs) < 0) {
 		PANIC_PERROR("KVM_GET_SREGS2");
 	}
-	if (ioctl(vm->vcpufd, KVM_GET_FPU, &fpu) < 0) {
+	if (ioctl(vcpufd, KVM_GET_FPU, &fpu) < 0) {
 		PANIC_PERROR("KVM_GET_FPU");
 	}
-	if (ioctl(vm->vcpufd, KVM_GET_XCRS, &xcrs) < 0) {
+	if (ioctl(vcpufd, KVM_GET_XCRS, &xcrs) < 0) {
 		PANIC_PERROR("KVM_GET_XCRS");
 	}
 
-	vmm_init(&vm->vmm);
-	gdt_init(&sregs, &vm->vmm);
-	idt_init(&sregs, &vm->vmm);
-	cpu_init_long(&sregs, &vm->vmm);
+	vmm_init(vmm);
+	gdt_init(&sregs, vmm);
+	idt_init(&sregs, vmm);
+	cpu_init_long(&sregs, vmm);
 	cpu_init_cache(&sregs);
 
 	// TODO: make it better
@@ -466,16 +426,16 @@ void cpu_init(struct vm *vm)
 		cpu_init_v4(&xcrs);
 	}
 
-	if (ioctl(vm->vcpufd, KVM_SET_REGS, &regs) < 0) {
+	if (ioctl(vcpufd, KVM_SET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_SET_REGS");
 	}
-	if (ioctl(vm->vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
+	if (ioctl(vcpufd, KVM_SET_SREGS2, &sregs) < 0) {
 		PANIC_PERROR("KVM_SET_SREGS2");
 	}
-	if (ioctl(vm->vcpufd, KVM_SET_FPU, &fpu) < 0) {
+	if (ioctl(vcpufd, KVM_SET_FPU, &fpu) < 0) {
 		PANIC_PERROR("KVM_SET_FPU");
 	}
-	if (ioctl(vm->vcpufd, KVM_SET_XCRS, &xcrs) < 0) {
+	if (ioctl(vcpufd, KVM_SET_XCRS, &xcrs) < 0) {
 		PANIC_PERROR("KVM_SET_XCRS");
 	}
 }
