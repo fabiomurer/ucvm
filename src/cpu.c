@@ -399,6 +399,7 @@ void cpu_clear_regs(struct kvm_regs *regs)
 	regs->r14 = 0;
 	regs->r15 = 0;
 	regs->rip = 0;
+	regs->rflags = 0;
 }
 
 void cpu_init(int vcpufd, struct kvm_cpuid2* vcpu_cpuid, struct vmm *vmm)

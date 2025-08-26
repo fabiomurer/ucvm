@@ -1,7 +1,0 @@
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/ucvm.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/gdbstub_lib.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/format.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/create_compile_commands_symlink.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/lint.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/edit_cache.dir
-/home/runner/work/ucvm/ucvm/build/CMakeFiles/rebuild_cache.dir
