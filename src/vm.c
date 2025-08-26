@@ -86,6 +86,7 @@ struct vm vm_create(void)
 		PANIC("KVM API version not supported");
 	}
 
+	/*
 	int support_exception_payload =
 		ioctl(vm.kvmfd, KVM_CHECK_EXTENSION, KVM_CAP_EXCEPTION_PAYLOAD);
 	if (support_exception_payload <= 0) {
@@ -96,6 +97,7 @@ struct vm vm_create(void)
 	if (supported_sync_regs != KVM_SYNC_X86_VALID_FIELDS) {
 		PANIC("KVM_CAP_SYNC_REGS not supported");
 	}
+	*/
 
 	// create a vm
 	if ((vm.vmfd = ioctl(vm.kvmfd, KVM_CREATE_VM, 0)) < 0) {
@@ -243,27 +245,6 @@ void vm_set_debug_step(struct vm *vm, bool enable_step)
 	}
 }
 
-void clear_regs(struct kvm_regs *regs)
-{
-	regs->rax = 0;
-	regs->rbx = 0;
-	regs->rcx = 0;
-	regs->rdx = 0;
-	regs->rsi = 0;
-	regs->rdi = 0;
-	regs->rbp = 0;
-	regs->rsp = 0;
-	regs->r8 = 0;
-	regs->r9 = 0;
-	regs->r10 = 0;
-	regs->r11 = 0;
-	regs->r12 = 0;
-	regs->r13 = 0;
-	regs->r14 = 0;
-	regs->r15 = 0;
-	regs->rip = 0;
-}
-
 void vm_load_program(struct vm *vm, char **argv)
 {
 	create_linux_view(argv, &vm->linux_view);
@@ -273,8 +254,6 @@ void vm_load_program(struct vm *vm, char **argv)
 	if (ioctl(vm->vcpufd, KVM_GET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_GET_REGS");
 	}
-
-	clear_regs(&regs); // clear some leftover junk ??
 
 	struct user_regs_struct linux_view_regs;
 	linux_view_get_regs(&vm->linux_view, &linux_view_regs);
@@ -294,7 +273,7 @@ int vm_run(struct vm *vm)
 	if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
 		PANIC_PERROR("KVM_RUN");
 	}
-
+	
 	return vm->run->exit_reason;
 }
 

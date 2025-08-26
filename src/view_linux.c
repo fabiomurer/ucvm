@@ -158,12 +158,14 @@ void linux_view_manager_init(pid_t child, struct linux_view *linux_view)
 		PANIC("Unexpected stop before exec event occurred.");
 	}
 
+	/*
 	// Single-step: after PTRACE_EVENT_EXEC a PTRACE_SINGLESTEP (maybe) is required to step
 	// into the program. RIP does't change ater it so i assume that no assemby is runned.
 	if (ptrace(PTRACE_SINGLESTEP, child, 0, 0) < 0) {
 		PANIC_PERROR("ptrace(PTRACE_SINGLESTEP)");
 	}
 	waitpid(child, nullptr, 0);
+	*/
 
 #ifdef DEBUG
 	printf("process with pid: %d is loaded and stopped\n", child);

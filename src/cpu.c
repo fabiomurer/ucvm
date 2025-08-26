@@ -380,6 +380,27 @@ execution from data pages.
 	sregs->gs = gdt_data_segment;
 }
 
+void cpu_clear_regs(struct kvm_regs *regs)
+{
+	regs->rax = 0;
+	regs->rbx = 0;
+	regs->rcx = 0;
+	regs->rdx = 0;
+	regs->rsi = 0;
+	regs->rdi = 0;
+	regs->rbp = 0;
+	regs->rsp = 0;
+	regs->r8 = 0;
+	regs->r9 = 0;
+	regs->r10 = 0;
+	regs->r11 = 0;
+	regs->r12 = 0;
+	regs->r13 = 0;
+	regs->r14 = 0;
+	regs->r15 = 0;
+	regs->rip = 0;
+}
+
 void cpu_init(int vcpufd, struct kvm_cpuid2* vcpu_cpuid, struct vmm *vmm)
 {
 
@@ -425,6 +446,8 @@ void cpu_init(int vcpufd, struct kvm_cpuid2* vcpu_cpuid, struct vmm *vmm)
 	if (vcpulevel == x86_64_v4) {
 		cpu_init_v4(&xcrs);
 	}
+
+	cpu_clear_regs(&regs);
 
 	if (ioctl(vcpufd, KVM_SET_REGS, &regs) < 0) {
 		PANIC_PERROR("KVM_SET_REGS");
