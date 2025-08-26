@@ -75,8 +75,8 @@ type of segment = 0
 struct gdt_entry {
 	uint64_t limit0;
 	uint64_t base0;
-	uint64_t base1: 8, type: 4, s: 1, dpl: 2, p: 1;
-	uint64_t limit1: 4, avl: 1, l: 1, d: 1, g: 1, base2: 8;
+	uint64_t base1 : 8, type : 4, s : 1, dpl : 2, p : 1;
+	uint64_t limit1 : 4, avl : 1, l : 1, d : 1, g : 1, base2 : 8;
 } __attribute__((packed));
 
 const struct gdt_entry CODE_SEG = {
@@ -85,7 +85,7 @@ const struct gdt_entry CODE_SEG = {
 	.base1 = 0,
 	.type = (TYPE_A_ACCES_DONTSET | TYPE_RW_CODE_READ | TYPE_DC_CODE_EXEC_IFDLP | TYPE_E_CODE),
 	.s = S_DATA_OR_CODE,
-	.dpl = DLP_KERNEL, //DLP_USER, 
+	.dpl = DLP_KERNEL, // DLP_USER,
 	.p = P_VALID,
 	.limit1 = 0xF,
 	.avl = AVL,
@@ -101,7 +101,7 @@ const struct gdt_entry DATA_SEG = {
 	.base1 = 0,
 	.type = 0x2 | 0x1,
 	.s = S_DATA_OR_CODE,
-	.dpl = DLP_KERNEL, //DLP_USER,
+	.dpl = DLP_KERNEL, // DLP_USER,
 	.p = P_VALID,
 	.limit1 = (TYPE_A_ACCES_DONTSET | TYPE_RW_DATA_WRITE | TYPE_E_DATA),
 	.avl = AVL,
@@ -116,7 +116,10 @@ struct kvm_segment gdt_seg_from_desc(struct gdt_entry e, uint32_t idx)
 	struct kvm_segment res = {
 		.base = e.base0 | ((uint64_t)e.base1 << 16) | ((uint64_t)e.base2 << 24),
 		.limit = (uint64_t)e.limit0 | ((uint64_t)e.limit1 << 16),
-		.selector = (idx * sizeof(struct gdt_entry)), // | RPL_USER, // https://wiki.osdev.org/Segment_Selector RPL
+		.selector =
+			(idx * sizeof(struct gdt_entry)), // | RPL_USER, //
+							  // https://wiki.osdev.org/Segment_Selector
+							  // RPL
 		.type = e.type,
 		.present = e.p,
 		.dpl = e.dpl,
@@ -134,13 +137,13 @@ struct kvm_segment gdt_seg_from_desc(struct gdt_entry e, uint32_t idx)
 
 void gdt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
 {
-    // alloc one page for GDT
+	// alloc one page for GDT
 	struct frame mem_gdt = { 0 };
 	if (vmm_get_free_frame(vmm, &mem_gdt) != 0) {
 		PANIC("get_free_frame");
 	}
 
-    struct gdt_entry *gdt = (struct gdt_entry *)mem_gdt.host_virtual_addr;
+	struct gdt_entry *gdt = (struct gdt_entry *)mem_gdt.host_virtual_addr;
 
 	// set all to null, so first is null descriptor
 	memset(gdt, 0, PAGE_SIZE);
@@ -159,11 +162,11 @@ void gdt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
 struct kvm_segment gdt_get_segment(int idx)
 {
 	switch (idx) {
-		case GDT_IDX_CODE: 
-			return gdt_seg_from_desc(CODE_SEG, GDT_IDX_CODE);
-		case GDT_IDX_DATA:
-			return gdt_seg_from_desc(DATA_SEG, GDT_IDX_DATA);
-		default:
-			PANIC("segment idx not valid");
+	case GDT_IDX_CODE:
+		return gdt_seg_from_desc(CODE_SEG, GDT_IDX_CODE);
+	case GDT_IDX_DATA:
+		return gdt_seg_from_desc(DATA_SEG, GDT_IDX_DATA);
+	default:
+		PANIC("segment idx not valid");
 	}
 }

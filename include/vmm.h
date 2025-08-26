@@ -7,6 +7,7 @@
 
 #include "intrusive_dlist.h"
 
+// clang-format off
 /*
 linux virtual memory map with 4-level page table
 
@@ -17,6 +18,7 @@ ffff_8000_0000_0000 	-128 TiB 	ffff_ffff_ffff_ffff 	128 TiB 	kernel-space virtua
 
 we can assume that the kernel space virtual memory is not touched by the userspace
 */
+// clang-format on
 
 #define LINUX_VM_USER_START 0x0000000000000000ULL
 #define LINUX_VM_NONCANONICAL_START 0x0000800000000000ULL
@@ -43,11 +45,11 @@ struct frame {
 };
 
 struct vmm {
-	void* mem_host_virtual_addr;
+	void *mem_host_virtual_addr;
 	struct frame pml4t_addr;
 
 	struct frame frames_pool[PAGE_NUMBER];
- 	struct dlist_head free_frames_list;
+	struct dlist_head free_frames_list;
 };
 
 void vmm_init(struct vmm *vmm);

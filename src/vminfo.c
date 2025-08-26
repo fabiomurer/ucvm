@@ -42,7 +42,7 @@ char exceptions_names[][30] = { "divide error",
 
 void vcpu_events_logs(struct vm *vm)
 {
-	struct kvm_vcpu_events* events = vm_get_vcpu_events(vm);
+	struct kvm_vcpu_events *events = vm_get_vcpu_events(vm);
 
 	printf("exceptions:\n\t"
 	       "injected: %d\n\t"
@@ -54,8 +54,8 @@ void vcpu_events_logs(struct vm *vm)
 	       "exception_payload: %p\n",
 	       events->exception.injected, events->exception.nr,
 	       exceptions_names[events->exception.nr], events->exception.has_error_code,
-	       events->exception.pending, events->exception.error_code, events->exception_has_payload,
-	       (void *)events->exception_payload);
+	       events->exception.pending, events->exception.error_code,
+	       events->exception_has_payload, (void *)events->exception_payload);
 
 	printf("sipi_vector: %d\n", events->sipi_vector);
 

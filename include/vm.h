@@ -12,7 +12,7 @@ struct vm {
 	int vcpufd;
 	struct kvm_cpuid2 *vcpu_cpuid;
 	struct kvm_run *run;
-	
+
 	struct vmm vmm;
 
 	struct linux_view linux_view;

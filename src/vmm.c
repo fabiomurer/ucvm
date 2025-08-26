@@ -7,7 +7,6 @@
 #include "utils.h"
 #include <sys/user.h>
 
-
 size_t guest_physical_addr_to_pfn(uint64_t guest_physical_addr)
 {
 	return (guest_physical_addr - GUEST_PHYS_ADDR) / PAGE_SIZE;
@@ -19,8 +18,10 @@ void free_frames_list_init(struct vmm *vmm)
 
 	for (size_t i = 0; i < PAGE_NUMBER; i++) {
 		vmm->frames_pool[i].pfn = i;
-		vmm->frames_pool[i].host_virtual_addr = (uint64_t)vmm->mem_host_virtual_addr + (i * PAGE_SIZE);
-		vmm->frames_pool[i].guest_physical_addr = (uint64_t)GUEST_PHYS_ADDR + (i * PAGE_SIZE);
+		vmm->frames_pool[i].host_virtual_addr =
+			(uint64_t)vmm->mem_host_virtual_addr + (i * PAGE_SIZE);
+		vmm->frames_pool[i].guest_physical_addr =
+			(uint64_t)GUEST_PHYS_ADDR + (i * PAGE_SIZE);
 
 		dlist_init(&vmm->frames_pool[i].list);
 		dlist_add_tail(&vmm->frames_pool[i].list, &vmm->free_frames_list);
@@ -65,9 +66,9 @@ int vmm_get_free_frame(struct vmm *vmm, struct frame *frame)
 		return err;
 	}
 
-	frame->pfn 					= vmm->frames_pool[pfn].pfn;
-	frame->host_virtual_addr 	= vmm->frames_pool[pfn].host_virtual_addr;
-	frame->guest_physical_addr 	= vmm->frames_pool[pfn].guest_physical_addr;
+	frame->pfn = vmm->frames_pool[pfn].pfn;
+	frame->host_virtual_addr = vmm->frames_pool[pfn].host_virtual_addr;
+	frame->guest_physical_addr = vmm->frames_pool[pfn].guest_physical_addr;
 	return 0;
 }
 
@@ -115,7 +116,7 @@ void vmm_init(struct vmm *vmm)
 
 #define PAGE_FLAGS (PAGE_PRESENT | PAGE_RW | PAGE_CACHE_WB) // | PAGE_USER
 // ?
-struct frame jump_next_frame(uint64_t gaddr, void* mem_host_virtual_addr)
+struct frame jump_next_frame(uint64_t gaddr, void *mem_host_virtual_addr)
 {
 	// rounds gaddr down to the nearest multiple of PAGE_SIZE
 	gaddr = (gaddr / PAGE_SIZE) * PAGE_SIZE;

@@ -5,16 +5,13 @@
 #include "utils.h"
 
 enum {
-    IDTENTRY_TYPE_INTERRUPT = 0xE,
-    IDTENTRY_TYPE_TRAP = 0xF,
-    IDTENTRY_TYPE_CALL = 0xC,
-    IDTENTRY_TYPE_TASK = 0x5,
+	IDTENTRY_TYPE_INTERRUPT = 0xE,
+	IDTENTRY_TYPE_TRAP = 0xF,
+	IDTENTRY_TYPE_CALL = 0xC,
+	IDTENTRY_TYPE_TASK = 0x5,
 };
 
-enum {
-    IDTENTRY_NUM = 256
-};
-
+enum { IDTENTRY_NUM = 256 };
 
 struct idt_entry {
 	uint16_t offset_low;
@@ -27,21 +24,21 @@ struct idt_entry {
 
 void idt_init(struct kvm_sregs2 *sregs, struct vmm *vmm)
 {
-    struct frame mem_idt = { 0 };
+	struct frame mem_idt = { 0 };
 	if (vmm_get_free_frame(vmm, &mem_idt) != 0) {
 		PANIC("get_free_frame");
 	}
 
-    vmm_map_addr(vmm, IDT_VADDR, mem_idt.guest_physical_addr);
+	vmm_map_addr(vmm, IDT_VADDR, mem_idt.guest_physical_addr);
 	struct idt_entry *idt = (struct idt_entry *)mem_idt.host_virtual_addr;
 
-    // Set up a template for a non-present interrupt gate.
+	// Set up a template for a non-present interrupt gate.
 	// Any attempt to use this gate will cause a #NP fault (Not Present)
 	struct idt_entry entry = { 0 };
 	entry.selector = gdt_get_segment(GDT_IDX_CODE).selector;
 	entry.type = IDTENTRY_TYPE_INTERRUPT;
-    entry.dpl = 0;
-    entry.p = 0;
+	entry.dpl = 0;
+	entry.p = 0;
 
 	// Fill the entire IDT with non-present gates.
 	for (int i = 0; i < IDTENTRY_NUM; i++) {
