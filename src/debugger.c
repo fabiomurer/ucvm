@@ -314,7 +314,8 @@ static int write_reg(void *args, int regno, void *data)
 
 	void *reg_ptr = regptr(regno, debug_args);
 	if (reg_ptr == NULL) {
-		memset(data, 0, x86_64_regs_size[regno]);
+		// Cannot write to unsupported registers - do nothing
+		return 0;
 	} else {
 		memcpy(reg_ptr, data, x86_64_regs_size[regno]);
 	}
