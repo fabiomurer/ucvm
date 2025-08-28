@@ -124,22 +124,22 @@ void *regptr(int regno, struct debug_args *debug_args)
 
 	/* Segment registers */
 	case GDB_CPU_X86_64_REG_CS:
-		reg_ptr = &debug_args->sregs.cs;
+		reg_ptr = &debug_args->sregs.cs.selector;
 		break;
 	case GDB_CPU_X86_64_REG_SS:
-		reg_ptr = &debug_args->sregs.ss;
+		reg_ptr = &debug_args->sregs.ss.selector;
 		break;
 	case GDB_CPU_X86_64_REG_DS:
-		reg_ptr = &debug_args->sregs.ds;
+		reg_ptr = &debug_args->sregs.ds.selector;
 		break;
 	case GDB_CPU_X86_64_REG_ES:
-		reg_ptr = &debug_args->sregs.es;
+		reg_ptr = &debug_args->sregs.es.selector;
 		break;
 	case GDB_CPU_X86_64_REG_FS:
-		reg_ptr = &debug_args->sregs.fs;
+		reg_ptr = &debug_args->sregs.fs.selector;
 		break;
 	case GDB_CPU_X86_64_REG_GS:
-		reg_ptr = &debug_args->sregs.gs;
+		reg_ptr = &debug_args->sregs.gs.selector;
 		break;
 
 	/* FPU ST registers (80-bit floating point) */
@@ -313,9 +313,7 @@ static int write_reg(void *args, int regno, void *data)
 		return EFAULT;
 
 	void *reg_ptr = regptr(regno, debug_args);
-	if (reg_ptr == NULL) {
-		memset(data, 0, x86_64_regs_size[regno]);
-	} else {
+	if (reg_ptr != NULL) {
 		memcpy(reg_ptr, data, x86_64_regs_size[regno]);
 	}
 
