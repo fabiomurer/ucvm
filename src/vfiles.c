@@ -18,7 +18,7 @@ const char virtual_passwd[] =
 	"lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin\n"
 	"mail:x:8:8:mail:/var/mail:/usr/sbin/nologin\n"
 	"news:x:9:9:news:/var/spool/news:/usr/sbin/nologin\n"
-	"ucvm:x:1001:1001:User Ucvm:/home/u1:/bin/bash\n";
+	"ucvm:x:1001:1001:User Ucvm:/home/u1:/bin/bash\n\0";
 
 const char virtual_shadow[] =
 	"root:$6$abcdefgh$1234567890abcdefghijklmnopqrstuvwx:19000:0:99999:7:::\n"
@@ -31,12 +31,12 @@ const char virtual_shadow[] =
 	"lp:*:19000:0:99999:7:::\n"
 	"mail:*:19000:0:99999:7:::\n"
 	"news:*:19000:0:99999:7:::\n"
-	"ucvm:$6$ijklmnop$0987654321ponmlkjihgfedcbazyxwvutsr:19000:0:99999:7:::\n";
+	"ucvm:$6$ijklmnop$0987654321ponmlkjihgfedcbazyxwvutsr:19000:0:99999:7:::\n\0";
 
 struct virtual_file {
 	const char *virtual_name;
 	const char *content;
-	size_t content_len;
+	ssize_t content_len;
 };
 
 #define VFILES_N 2
@@ -44,11 +44,11 @@ struct virtual_file {
 const struct virtual_file vfiles[VFILES_N] = {
 	{ .virtual_name = "/etc/passwd",
 	  .content = virtual_passwd,
-	  .content_len = sizeof(virtual_passwd) - 1 }, // Use sizeof for compile-time length
+	  .content_len = sizeof(virtual_passwd)}, // Use sizeof for compile-time length
 
 	{ .virtual_name = "/etc/shadow",
 	  .content = virtual_shadow,
-	  .content_len = sizeof(virtual_shadow) - 1 }
+	  .content_len = sizeof(virtual_shadow)}
 };
 
 int create_mem_fd(const char *name, const char *content, ssize_t len)

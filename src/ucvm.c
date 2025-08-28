@@ -16,6 +16,7 @@ static char args_doc[] = "[ARGS...]";
 static struct argp_option options[] = { { "debug", 'd', "HOST:PORT", 0,
 					  "Enable debug mode with specified server", 0 },
 					{ "trace", 't', 0, 0, "Enable trace mode", 0 },
+					{ "vfiles", 'f', 0, 0, "Enable virtual files", 0 },
 					{ "pin", 'p', "CORE", 0, "Pin to specified CPU core", 0 },
 					{ 0 } };
 
@@ -30,6 +31,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case 't': /* --trace */
 		arguments->trace_enabled = true;
+		break;
+	case 'f': /* --vfiles */
+		arguments->vfiles_enabled = true;
 		break;
 	case 'p': /* --pin */
 		arguments->cpu_pin = atoi(arg);
@@ -57,18 +61,8 @@ int find_dash_dash_position(int argc, char *argv[])
 	return -1; /* Not found */
 }
 
-// global variable
-struct arguments arguments;
-
 int main(int argc, char *argv[])
 {
-	/* Default values */
-	arguments.trace_enabled = false;
-	arguments.debug_server = NULL;
-	arguments.program_args = NULL;
-	arguments.program_args_count = 0;
-	arguments.cpu_pin = -1; /* -1 indicates no pinning */
-
 	/* Find the position of -- if it exists */
 	int separator_pos = find_dash_dash_position(argc, argv);
 

@@ -2,6 +2,7 @@
 
 struct arguments {
 	bool trace_enabled;
+	bool vfiles_enabled;
 	char *debug_server;
 	char **program_args;
 	int program_args_count;
