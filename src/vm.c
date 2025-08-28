@@ -307,24 +307,20 @@ void vm_page_fault_handler(struct vm *vm, uint64_t cr2)
 void vm_exit_handler(int exit_code, struct vm *vm)
 {
 	switch (exit_code) {
-	case KVM_EXIT_DEBUG:
-		printf("KVM_EXIT_DEBUG\n");
-		printf("exception: 0x%x\n"
-		       "pad: 0x%x\n"
-		       "pc: 0x%llx\n"
-		       "dr6: 0x%llx\n"
-		       "dr7: 0x%llx\n",
-		       vm->run->debug.arch.exception, vm->run->debug.arch.pad,
-		       vm->run->debug.arch.pc, vm->run->debug.arch.dr6, vm->run->debug.arch.dr7);
-		break;
 	case KVM_EXIT_HLT:
-		printf("KVM_EXIT_HLT\n");
+		PANIC("KVM_EXIT_HLT");
 		break;
 
 	case KVM_EXIT_SHUTDOWN:
 		struct kvm_regs *regs = vm_get_regs(vm);
 		struct kvm_sregs *sregs = vm_get_sregs(vm);
 		struct kvm_vcpu_events *events = vm_get_vcpu_events(vm);
+
+		
+		//sometimes (tests/*-glibc) it returns #UD instead of #PF TODO: why?
+		if (sregs->cr2 != 0) {
+			events->exception.nr = EXCEPTION_PF;
+		}
 
 		switch (events->exception.nr) {
 		case EXCEPTION_UD:
