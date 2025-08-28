@@ -30,8 +30,10 @@
 #include "vlinux/syscall_brk.h"
 #include "vlinux/syscall_pread64.h"
 #include "vlinux/syscall_access.h"
+#include "vlinux/syscall_dup.h"
 #include "vlinux/syscall_getpid.h"
 #include "vlinux/syscall_exit.h"
+#include "vlinux/syscall_fcntl.h"
 #include "vlinux/syscall_arch_prctl.h"
 #include "vlinux/syscall_set_tid_address.h"
 #include "vlinux/syscall_exit_group.h"
@@ -161,6 +163,14 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		}
 		break;
 
+		HANDLE_SYSCALL(__NR_dup)
+		{
+			int oldfd = (int)arg1;
+
+			ret = syscall_dup(oldfd);
+		}
+		break;
+
 		HANDLE_SYSCALL(__NR_getpid)
 		{
 			ret = syscall_getpid();
@@ -172,6 +182,16 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 			int status = (int)arg1;
 
 			syscall_exit(status);
+		}
+		break;
+
+		HANDLE_SYSCALL(__NR_fcntl)
+		{
+			uint64_t fd 	= arg1;
+			uint64_t cmd 	= arg2;
+			uint64_t arg	= arg3;
+
+			ret = syscall_fcntl(fd, cmd, arg);
 		}
 		break;
 
