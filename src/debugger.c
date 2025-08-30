@@ -8,7 +8,7 @@
 #include "debugger.h"
 #include "utils.h"
 
-uint8_t break_instr = 0xcc;
+#define BREAK_INSTRUCTION 0xcc
 
 void debug_init(struct debug_args *debug_args)
 {
@@ -55,6 +55,113 @@ void debug_cycle(struct debug_args *debug_args)
 		PANIC_PERROR("KVM_GET_FPU");
 	}
 }
+
+enum GDB_REGISTER {
+	/* 64-bit general purpose registers */
+	GDB_CPU_X86_64_REG_RAX = 0,
+	GDB_CPU_X86_64_REG_RBX = 1,
+	GDB_CPU_X86_64_REG_RCX = 2,
+	GDB_CPU_X86_64_REG_RDX = 3,
+	GDB_CPU_X86_64_REG_RSI = 4,
+	GDB_CPU_X86_64_REG_RDI = 5,
+	GDB_CPU_X86_64_REG_RBP = 6,
+	GDB_CPU_X86_64_REG_RSP = 7,
+	GDB_CPU_X86_64_REG_R8 = 8,
+	GDB_CPU_X86_64_REG_R9 = 9,
+	GDB_CPU_X86_64_REG_R10 = 10,
+	GDB_CPU_X86_64_REG_R11 = 11,
+	GDB_CPU_X86_64_REG_R12 = 12,
+	GDB_CPU_X86_64_REG_R13 = 13,
+	GDB_CPU_X86_64_REG_R14 = 14,
+	GDB_CPU_X86_64_REG_R15 = 15,
+	GDB_CPU_X86_64_REG_RIP = 16,
+	GDB_CPU_X86_64_REG_EFLAGS = 17,
+	GDB_CPU_X86_64_REG_CS = 18,
+	GDB_CPU_X86_64_REG_SS = 19,
+	GDB_CPU_X86_64_REG_DS = 20,
+	GDB_CPU_X86_64_REG_ES = 21,
+	GDB_CPU_X86_64_REG_FS = 22,
+	GDB_CPU_X86_64_REG_GS = 23,
+
+	/* FPU registers */
+	GDB_CPU_X86_64_REG_ST0 = 24,
+	GDB_CPU_X86_64_REG_ST1 = 25,
+	GDB_CPU_X86_64_REG_ST2 = 26,
+	GDB_CPU_X86_64_REG_ST3 = 27,
+	GDB_CPU_X86_64_REG_ST4 = 28,
+	GDB_CPU_X86_64_REG_ST5 = 29,
+	GDB_CPU_X86_64_REG_ST6 = 30,
+	GDB_CPU_X86_64_REG_ST7 = 31,
+
+	GDB_CPU_X86_64_REG_FCTRL = 32,
+	GDB_CPU_X86_64_REG_FSTAT = 33,
+	GDB_CPU_X86_64_REG_FTAG = 34,
+	GDB_CPU_X86_64_REG_FISEG = 35,
+	GDB_CPU_X86_64_REG_FIOFF = 36,
+	GDB_CPU_X86_64_REG_FOSEG = 37,
+	GDB_CPU_X86_64_REG_FOOFF = 38,
+	GDB_CPU_X86_64_REG_FOP = 39,
+
+	/* SSE registers */
+	GDB_CPU_X86_64_REG_XMM0 = 40,
+	GDB_CPU_X86_64_REG_XMM1 = 41,
+	GDB_CPU_X86_64_REG_XMM2 = 42,
+	GDB_CPU_X86_64_REG_XMM3 = 43,
+	GDB_CPU_X86_64_REG_XMM4 = 44,
+	GDB_CPU_X86_64_REG_XMM5 = 45,
+	GDB_CPU_X86_64_REG_XMM6 = 46,
+	GDB_CPU_X86_64_REG_XMM7 = 47,
+	GDB_CPU_X86_64_REG_XMM8 = 48,
+	GDB_CPU_X86_64_REG_XMM9 = 49,
+	GDB_CPU_X86_64_REG_XMM10 = 50,
+	GDB_CPU_X86_64_REG_XMM11 = 51,
+	GDB_CPU_X86_64_REG_XMM12 = 52,
+	GDB_CPU_X86_64_REG_XMM13 = 53,
+	GDB_CPU_X86_64_REG_XMM14 = 54,
+	GDB_CPU_X86_64_REG_XMM15 = 55,
+
+	GDB_CPU_X86_64_REG_MXCSR,
+
+	/* AVX YMM registers */
+	GDB_CPU_X86_64_REG_YMM0,
+	GDB_CPU_X86_64_REG_YMM1,
+	GDB_CPU_X86_64_REG_YMM2,
+	GDB_CPU_X86_64_REG_YMM3,
+	GDB_CPU_X86_64_REG_YMM4,
+	GDB_CPU_X86_64_REG_YMM5,
+	GDB_CPU_X86_64_REG_YMM6,
+	GDB_CPU_X86_64_REG_YMM7,
+	GDB_CPU_X86_64_REG_YMM8,
+	GDB_CPU_X86_64_REG_YMM9,
+	GDB_CPU_X86_64_REG_YMM10,
+	GDB_CPU_X86_64_REG_YMM11,
+	GDB_CPU_X86_64_REG_YMM12,
+	GDB_CPU_X86_64_REG_YMM13,
+	GDB_CPU_X86_64_REG_YMM14,
+	GDB_CPU_X86_64_REG_YMM15,
+
+	GDB_CPU_X86_64_REG_COUNT
+};
+
+/* Register sizes in bytes for x86_64 architecture */
+const size_t x86_64_regs_size[GDB_CPU_X86_64_REG_COUNT] = {
+	/*general porpouse registers*/
+	8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 4, /*32-bit flags */
+	/*segments registers*/
+	4, 4, 4, 4, 4, 4,
+	/*fpu registers*/
+	10, 10, 10, 10, 10, 10, 10, 10,
+	/*fpu controls registers*/
+	4, 4, 4, 4, 4, 4, 4, 4,
+	/*sse registers*/
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	/*sse control/status register*/
+	4,
+
+	/* AVX YMM registers*/
+	16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+	/* mxcsr*/
+};
 
 void *regptr(int regno, struct debug_args *debug_args)
 {
@@ -275,9 +382,8 @@ size_t get_reg_bytes(int regno)
 {
 	if (regno < GDB_CPU_X86_64_REG_COUNT) {
 		return x86_64_regs_size[regno];
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
 static int read_reg(void *args, int regno, void *reg_value)
@@ -288,8 +394,9 @@ static int read_reg(void *args, int regno, void *reg_value)
 	printf("read_reg regno: %d\n", regno);
 #endif
 
-	if (regno >= GDB_CPU_X86_64_REG_COUNT)
+	if (regno >= GDB_CPU_X86_64_REG_COUNT) {
 		return EFAULT;
+	}
 
 	void *reg_ptr = regptr(regno, debug_args);
 	if (reg_ptr == NULL) {
@@ -320,31 +427,6 @@ static int write_reg(void *args, int regno, void *data)
 	return 0;
 }
 
-int memory_with_breakpoints(struct breakpoint breakpoints[], uint8_t *buff, size_t addr, size_t len)
-{
-	for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
-		struct breakpoint *bp = &breakpoints[i];
-		// this breakpoint is in that memory -> set it
-		if (bp->addr >= addr && bp->addr < addr + len) {
-			buff[bp->addr - addr] = break_instr;
-		}
-	}
-	return 0;
-}
-
-int memory_without_breakpoints(struct breakpoint breakpoints[], uint8_t *buff, size_t addr,
-			       size_t len)
-{
-	for (int i = 0; i < BREAKPOINTS_MAX_NUM; i++) {
-		struct breakpoint *bp = &breakpoints[i];
-		// this breakpoint is in that memory -> set it
-		if (bp->addr >= addr && bp->addr < addr + len) {
-			buff[bp->addr - addr] = bp->original_data;
-		}
-	}
-	return 0;
-}
-
 static int read_mem(void *args, size_t addr, size_t len, void *val)
 {
 #ifdef DEBUG
@@ -357,8 +439,6 @@ static int read_mem(void *args, size_t addr, size_t len, void *val)
 		return EFAULT;
 	}
 
-	memory_without_breakpoints(debug_args->breakpoints, val, addr, len);
-
 	return 0;
 }
 
@@ -368,8 +448,6 @@ static int write_mem(void *args, size_t addr, size_t len, void *val)
 	printf("write_mem addr: %p, len: %ld\n", (void *)addr, len);
 #endif
 	struct debug_args *debug_args = (struct debug_args *)args;
-
-	memory_with_breakpoints(debug_args->breakpoints, val, addr, len);
 
 	if (write_buffer_guest(debug_args->vm, addr, val, len) < 0) {
 		return EFAULT;
@@ -409,6 +487,7 @@ static bool set_bp(void *args, size_t addr, bp_type_t type)
 #ifdef DEBUG
 	printf("set_bp addr: %p, type: %d\n", (void *)addr, type);
 #endif
+	uint8_t break_instr = BREAK_INSTRUCTION;
 	struct debug_args *debug_args = (struct debug_args *)args;
 
 	if (type != BP_SOFTWARE) {
@@ -422,16 +501,16 @@ static bool set_bp(void *args, size_t addr, bp_type_t type)
 			bp->addr = addr;
 
 			// read the origina data
-			int ret = read_buffer_host(debug_args->vm, addr, &bp->original_data,
-						   sizeof(bp->original_data));
-			if (ret < 0)
+			if (read_buffer_host(debug_args->vm, addr, &bp->original_data,
+						   sizeof(bp->original_data)) < 0) {
 				return false; // cannot access memory
+			}
 
 			// replace it with break_inst
-			ret = write_buffer_guest(debug_args->vm, addr, &break_instr,
-						 sizeof(break_instr));
-			if (ret < 0)
+			if (write_buffer_guest(debug_args->vm, addr, &break_instr,
+						 sizeof(break_instr)) < 0) {
 				return false; // cannot access memory
+			}
 
 			return true;
 		}
@@ -454,10 +533,10 @@ static bool del_bp(void *args, size_t addr, bp_type_t type __attribute__((unused
 			bp->addr = 0;
 
 			// restore the instruction
-			int ret = write_buffer_guest(debug_args->vm, addr, &bp->original_data,
-						     sizeof(bp->original_data));
-			if (ret < 0)
+			if(write_buffer_guest(debug_args->vm, addr, &bp->original_data,
+						     sizeof(bp->original_data)) < 0) {
 				return false; // cannot access memory
+			}
 
 			return true;
 		}
@@ -467,22 +546,11 @@ static bool del_bp(void *args, size_t addr, bp_type_t type __attribute__((unused
 	return false;
 }
 
-static void on_interrupt(void *args __attribute__((unused)))
-{
-#ifdef DEBUG
-	printf("on_interrupt\n");
-#endif
-	// struct debug_args* debug_args = (struct debug_args*)args;
-
-	/*
-	exit ??
-	*/
-	exit(EXIT_SUCCESS);
-}
 
 arch_info_t arch_info = { .target_desc = TARGET_X86_64,
 			  .smp = 1,
-			  .reg_num = GDB_CPU_X86_64_REG_COUNT };
+			  .reg_num = GDB_CPU_X86_64_REG_COUNT 
+};
 
 struct target_ops ops = { .cont = cont,
 			  .stepi = stepi,
@@ -493,9 +561,10 @@ struct target_ops ops = { .cont = cont,
 			  .write_mem = write_mem,
 			  .set_bp = set_bp,
 			  .del_bp = del_bp,
-			  .on_interrupt = on_interrupt,
+			  .on_interrupt = nullptr,
 			  .set_cpu = nullptr,
-			  .get_cpu = nullptr };
+			  .get_cpu = nullptr 
+};
 
 void debug_start(char *debug_server, struct debug_args *debug_args)
 {
