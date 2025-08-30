@@ -143,6 +143,8 @@ enum GDB_REGISTER {
 	GDB_CPU_X86_64_REG_COUNT
 };
 
+#define MAX_REG_SIZE 8
+
 /* Register sizes in bytes for x86_64 architecture */
 const size_t x86_64_regs_size[GDB_CPU_X86_64_REG_COUNT] = {
 	/*general porpouse registers*/
@@ -250,29 +252,16 @@ void *regptr(int regno, struct debug_args *debug_args)
 		break;
 
 	/* FPU ST registers (80-bit floating point) */
+	// reg_ptr = debug_args->fpu.fpr[0];
 	case GDB_CPU_X86_64_REG_ST0:
-		reg_ptr = debug_args->fpu.fpr[0];
-		break;
 	case GDB_CPU_X86_64_REG_ST1:
-		reg_ptr = debug_args->fpu.fpr[1];
-		break;
 	case GDB_CPU_X86_64_REG_ST2:
-		reg_ptr = debug_args->fpu.fpr[2];
-		break;
 	case GDB_CPU_X86_64_REG_ST3:
-		reg_ptr = debug_args->fpu.fpr[3];
-		break;
 	case GDB_CPU_X86_64_REG_ST4:
-		reg_ptr = debug_args->fpu.fpr[4];
-		break;
 	case GDB_CPU_X86_64_REG_ST5:
-		reg_ptr = debug_args->fpu.fpr[5];
-		break;
 	case GDB_CPU_X86_64_REG_ST6:
-		reg_ptr = debug_args->fpu.fpr[6];
-		break;
 	case GDB_CPU_X86_64_REG_ST7:
-		reg_ptr = debug_args->fpu.fpr[7];
+		reg_ptr = NULL;
 		break;
 
 	/* FPU control registers */
@@ -302,53 +291,24 @@ void *regptr(int regno, struct debug_args *debug_args)
 		break;
 
 	/* SSE registers (XMM) */
+	//reg_ptr = debug_args->fpu.xmm[0];
 	case GDB_CPU_X86_64_REG_XMM0:
-		reg_ptr = debug_args->fpu.xmm[0];
-		break;
 	case GDB_CPU_X86_64_REG_XMM1:
-		reg_ptr = &debug_args->fpu.xmm[1];
-		break;
 	case GDB_CPU_X86_64_REG_XMM2:
-		reg_ptr = &debug_args->fpu.xmm[2];
-		break;
 	case GDB_CPU_X86_64_REG_XMM3:
-		reg_ptr = &debug_args->fpu.xmm[3];
-		break;
 	case GDB_CPU_X86_64_REG_XMM4:
-		reg_ptr = &debug_args->fpu.xmm[4];
-		break;
 	case GDB_CPU_X86_64_REG_XMM5:
-		reg_ptr = &debug_args->fpu.xmm[5];
-		break;
 	case GDB_CPU_X86_64_REG_XMM6:
-		reg_ptr = &debug_args->fpu.xmm[6];
-		break;
 	case GDB_CPU_X86_64_REG_XMM7:
-		reg_ptr = &debug_args->fpu.xmm[7];
-		break;
 	case GDB_CPU_X86_64_REG_XMM8:
-		reg_ptr = &debug_args->fpu.xmm[8];
-		break;
 	case GDB_CPU_X86_64_REG_XMM9:
-		reg_ptr = &debug_args->fpu.xmm[9];
-		break;
 	case GDB_CPU_X86_64_REG_XMM10:
-		reg_ptr = &debug_args->fpu.xmm[10];
-		break;
 	case GDB_CPU_X86_64_REG_XMM11:
-		reg_ptr = &debug_args->fpu.xmm[11];
-		break;
 	case GDB_CPU_X86_64_REG_XMM12:
-		reg_ptr = &debug_args->fpu.xmm[12];
-		break;
 	case GDB_CPU_X86_64_REG_XMM13:
-		reg_ptr = &debug_args->fpu.xmm[13];
-		break;
 	case GDB_CPU_X86_64_REG_XMM14:
-		reg_ptr = &debug_args->fpu.xmm[14];
-		break;
 	case GDB_CPU_X86_64_REG_XMM15:
-		reg_ptr = &debug_args->fpu.xmm[15];
+		reg_ptr = NULL;
 		break;
 
 	/* SSE control register */
@@ -398,11 +358,11 @@ static int read_reg(void *args, int regno, void *reg_value)
 		return EFAULT;
 	}
 
+	memset(reg_value, 0, MAX_REG_SIZE);
+
 	void *reg_ptr = regptr(regno, debug_args);
-	if (reg_ptr == NULL) {
-		memset(reg_value, 0, x86_64_regs_size[regno]);
-	} else {
-		memcpy(reg_value, reg_ptr, x86_64_regs_size[regno]);
+	if (reg_ptr != NULL) {
+		memcpy(reg_value, reg_ptr, get_reg_bytes(regno));
 	}
 
 	return 0;
@@ -421,7 +381,7 @@ static int write_reg(void *args, int regno, void *data)
 
 	void *reg_ptr = regptr(regno, debug_args);
 	if (reg_ptr != NULL) {
-		memcpy(reg_ptr, data, x86_64_regs_size[regno]);
+		memcpy(reg_ptr, data, get_reg_bytes(regno));
 	}
 
 	return 0;
