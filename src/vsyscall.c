@@ -36,6 +36,7 @@
 #include "vlinux/syscall_fcntl.h"
 #include "vlinux/syscall_arch_prctl.h"
 #include "vlinux/syscall_set_tid_address.h"
+#include "vlinux/syscall_fadvise64.h"
 #include "vlinux/syscall_exit_group.h"
 #include "vlinux/syscall_openat.h"
 #include "vlinux/syscall_readlinkat.h"
@@ -187,9 +188,9 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 
 		HANDLE_SYSCALL(__NR_fcntl)
 		{
-			uint64_t fd 	= arg1;
-			uint64_t cmd 	= arg2;
-			uint64_t arg	= arg3;
+			uint64_t fd = arg1;
+			uint64_t cmd = arg2;
+			uint64_t arg = arg3;
 
 			ret = syscall_fcntl(fd, cmd, arg);
 		}
@@ -207,6 +208,12 @@ uint64_t syscall_handler(struct vm *vm, struct kvm_regs *regs)
 		HANDLE_SYSCALL(__NR_set_tid_address)
 		{
 			ret = syscall_set_tid_address();
+		}
+		break;
+
+		HANDLE_SYSCALL(__NR_fadvise64)
+		{
+			ret = syscall_fadvise64(arg1, arg2, arg3, arg4);
 		}
 		break;
 

@@ -291,7 +291,7 @@ void *regptr(int regno, struct debug_args *debug_args)
 		break;
 
 	/* SSE registers (XMM) */
-	//reg_ptr = debug_args->fpu.xmm[0];
+	// reg_ptr = debug_args->fpu.xmm[0];
 	case GDB_CPU_X86_64_REG_XMM0:
 	case GDB_CPU_X86_64_REG_XMM1:
 	case GDB_CPU_X86_64_REG_XMM2:
@@ -462,13 +462,13 @@ static bool set_bp(void *args, size_t addr, bp_type_t type)
 
 			// read the origina data
 			if (read_buffer_host(debug_args->vm, addr, &bp->original_data,
-						   sizeof(bp->original_data)) < 0) {
+					     sizeof(bp->original_data)) < 0) {
 				return false; // cannot access memory
 			}
 
 			// replace it with break_inst
 			if (write_buffer_guest(debug_args->vm, addr, &break_instr,
-						 sizeof(break_instr)) < 0) {
+					       sizeof(break_instr)) < 0) {
 				return false; // cannot access memory
 			}
 
@@ -493,8 +493,8 @@ static bool del_bp(void *args, size_t addr, bp_type_t type __attribute__((unused
 			bp->addr = 0;
 
 			// restore the instruction
-			if(write_buffer_guest(debug_args->vm, addr, &bp->original_data,
-						     sizeof(bp->original_data)) < 0) {
+			if (write_buffer_guest(debug_args->vm, addr, &bp->original_data,
+					       sizeof(bp->original_data)) < 0) {
 				return false; // cannot access memory
 			}
 
@@ -506,11 +506,9 @@ static bool del_bp(void *args, size_t addr, bp_type_t type __attribute__((unused
 	return false;
 }
 
-
 arch_info_t arch_info = { .target_desc = TARGET_X86_64,
 			  .smp = 1,
-			  .reg_num = GDB_CPU_X86_64_REG_COUNT 
-};
+			  .reg_num = GDB_CPU_X86_64_REG_COUNT };
 
 struct target_ops ops = { .cont = cont,
 			  .stepi = stepi,
@@ -523,8 +521,7 @@ struct target_ops ops = { .cont = cont,
 			  .del_bp = del_bp,
 			  .on_interrupt = nullptr,
 			  .set_cpu = nullptr,
-			  .get_cpu = nullptr 
-};
+			  .get_cpu = nullptr };
 
 void debug_start(char *debug_server, struct debug_args *debug_args)
 {

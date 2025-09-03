@@ -7,7 +7,7 @@
 #include <linux/limits.h>
 #include <unistd.h>
 #include "vfiles.h"
-# include "arguments.h"
+#include "arguments.h"
 
 uint64_t syscall_openat(struct vm *vm, int dirfd, uint64_t filename, int flags, mode_t mode)
 {

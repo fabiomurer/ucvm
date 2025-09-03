@@ -3,5 +3,5 @@
 
 int syscall_dup(int oldfd)
 {
-    return dup(oldfd);
+	return dup(oldfd);
 }

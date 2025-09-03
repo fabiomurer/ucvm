@@ -273,7 +273,7 @@ int vm_run(struct vm *vm)
 	if (ioctl(vm->vcpufd, KVM_RUN, NULL) < 0) {
 		PANIC_PERROR("KVM_RUN");
 	}
-	
+
 	return vm->run->exit_reason;
 }
 
@@ -316,8 +316,7 @@ void vm_exit_handler(int exit_code, struct vm *vm)
 		struct kvm_sregs *sregs = vm_get_sregs(vm);
 		struct kvm_vcpu_events *events = vm_get_vcpu_events(vm);
 
-		
-		//sometimes (tests/*-glibc) it returns #UD instead of #PF TODO: why?
+		// sometimes (tests/*-glibc) it returns #UD instead of #PF TODO: why?
 		if (sregs->cr2 != 0) {
 			events->exception.nr = EXCEPTION_PF;
 		}

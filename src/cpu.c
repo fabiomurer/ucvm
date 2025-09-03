@@ -203,19 +203,19 @@ void cpu_init_fpu(struct kvm_fpu *fpu)
 	*/
 
 // x87 FPU Control Word Flags
-#define FCW_IM  (1 << 0)  // Invalid Operation Mask
-#define FCW_DM  (1 << 1)  // Denormalized Operand Mask
-#define FCW_ZM  (1 << 2)  // Zero Divide Mask
-#define FCW_OM  (1 << 3)  // Overflow Mask
-#define FCW_UM  (1 << 4)  // Underflow Mask
-#define FCW_PM  (1 << 5)  // Precision Mask
-#define FCW_PC  (3 << 8)  // Precision Control (11b = Double Precision)
-#define FCW_RC  (0 << 10) // Rounding Control (00b = Round to Nearest)
-#define FCW_X   (0 << 12) // Infinity Control (obsolete, always zero)
+#define FCW_IM (1 << 0)	 // Invalid Operation Mask
+#define FCW_DM (1 << 1)	 // Denormalized Operand Mask
+#define FCW_ZM (1 << 2)	 // Zero Divide Mask
+#define FCW_OM (1 << 3)	 // Overflow Mask
+#define FCW_UM (1 << 4)	 // Underflow Mask
+#define FCW_PM (1 << 5)	 // Precision Mask
+#define FCW_PC (3 << 8)	 // Precision Control (11b = Double Precision)
+#define FCW_RC (0 << 10) // Rounding Control (00b = Round to Nearest)
+#define FCW_X (0 << 12)	 // Infinity Control (obsolete, always zero)
 
 // x87 FPU Tag Word (8x2 bits, one per register)
 // 0b11 (0x3) = Empty, 0b00 = Valid, 0b01 = Zero, 0b10 = Special
-#define FTWX_ALL_EMPTY 0xFF  // All 8 registers empty (2 bits per reg, all set)
+#define FTWX_ALL_EMPTY 0xFF // All 8 registers empty (2 bits per reg, all set)
 
 // MXCSR Exception Masks
 #define MXCSR_PM (1UL << 12)
@@ -225,15 +225,9 @@ void cpu_init_fpu(struct kvm_fpu *fpu)
 #define MXCSR_DM (1UL << 8)
 #define MXCSR_IM (1UL << 7)
 
-	fpu->fcw  = FCW_IM | FCW_DM | FCW_ZM | FCW_OM |
-                FCW_UM | FCW_PM | FCW_PC | FCW_RC | FCW_X;
+	fpu->fcw = FCW_IM | FCW_DM | FCW_ZM | FCW_OM | FCW_UM | FCW_PM | FCW_PC | FCW_RC | FCW_X;
 	fpu->ftwx = FTWX_ALL_EMPTY;
-	fpu->mxcsr = MXCSR_PM |
-		MXCSR_UM |
-		MXCSR_OM |
-		MXCSR_ZM |
-		MXCSR_DM |
-		MXCSR_IM;
+	fpu->mxcsr = MXCSR_PM | MXCSR_UM | MXCSR_OM | MXCSR_ZM | MXCSR_DM | MXCSR_IM;
 }
 
 void cpu_init_avx(struct kvm_sregs2 *sregs, struct kvm_xcrs *xrcs)
@@ -401,9 +395,8 @@ void cpu_clear_regs(struct kvm_regs *regs)
 	regs->rip = 0;
 }
 
-void cpu_init(int vcpufd, struct kvm_cpuid2* vcpu_cpuid, struct vmm *vmm)
+void cpu_init(int vcpufd, struct kvm_cpuid2 *vcpu_cpuid, struct vmm *vmm)
 {
-
 	microarchitecture_level vcpulevel = cpu_microarchitecture_levels(vcpu_cpuid);
 
 	struct kvm_regs regs;

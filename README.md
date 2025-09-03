@@ -1,6 +1,26 @@
 # UCVM 
 run programs in a KVM virtual machine without an os
 
+## Demo
+
+```
+$ cat /etc/shadow
+cat: /etc/shadow: Permission denied
+$
+$ ./ucvm -f -- cat /etc/shadow
+root:$6$abcdefgh$1234567890abcdefghijklmnopqrstuvwx:19000:0:99999:7:::
+daemon:*:19000:0:99999:7:::
+bin:*:19000:0:99999:7:::
+sys:*:19000:0:99999:7:::
+sync:*:19000:0:99999:7:::
+games:*:19000:0:99999:7:::
+man:*:19000:0:99999:7:::
+lp:*:19000:0:99999:7:::
+mail:*:19000:0:99999:7:::
+news:*:19000:0:99999:7:::
+ucvm:$6$ijklmnop$0987654321ponmlkjihgfedcbazyxwvutsr:19000:0:99999:7:::
+```
+
 ## Usage
 
 ```
@@ -9,6 +29,7 @@ Usage: ucvm [OPTION...] [ARGS...]
 Run user-mode code in a kvm vm
 
   -d, --debug=HOST:PORT      Enable debug mode with specified server
+  -f, --vfiles               Enable virtual files
   -p, --pin=CORE             Pin to specified CPU core
   -t, --trace                Enable trace mode
   -?, --help                 Give this help list
@@ -26,10 +47,10 @@ Report bugs to https://github.com/fabiomurer/ucvm.
 compile test:
 ```bash
 # in ucvm/tests
-make
+$ make
 
 # run it
-./ucvm -t -- [test_name] # for ex. ./hello
+$ ./ucvm -t -- [test_name] # for ex. ./hello
 ```
 
 ## Debugging virtualized program with gdb
@@ -40,7 +61,7 @@ For example debug the test `hello`
 in one terminal start `ucvm` with debug option
 ```bash
 # in debug/
-./ucvm --debug="127.0.0.1:1234" -t -- ../ucvm/tests/hello
+$ ./ucvm --debug="127.0.0.1:1234" -t -- ../ucvm/tests/hello
 ```
 
 in one terminal run gdb in remote mode
@@ -75,14 +96,14 @@ $ bash benchmark.bash [test-name] # es ./hello
 ### preparation
 
 ```bash
-mkdir ucvm_
-cd ucvm_
-mkdir debug
-mkdir release
-git clone https://github.com/fabiomurer/ucvm.git
-cd ucvm
-git submodule init
-git submodule update
+$ mkdir ucvm_
+$ cd ucvm_
+$ mkdir debug
+$ mkdir release
+$ git clone https://github.com/fabiomurer/ucvm.git
+$ cd ucvm
+$ git submodule init
+$ git submodule update
 ```
 
 directory tree should look like this:
@@ -99,20 +120,20 @@ directory tree should look like this:
 ### release
 in `release/` folder
 ```bash
-cmake ../ucvm/ -DCMAKE_BUILD_TYPE=Release
-make
+$ cmake ../ucvm/ -DCMAKE_BUILD_TYPE=Release
+$ make
 ```
 
 ### debug
 in `debug/` folder
 ```bash
-cmake ../ucvm/
-make
+$ cmake ../ucvm/
+$ make
 ```
 
 ### formatting and linting
 in `debug/` or `release/` folder
 ```bash
-make format
-make lint
+$ make format
+$ make lint
 ```
