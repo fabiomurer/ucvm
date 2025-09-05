@@ -49,7 +49,7 @@ $ cat /etc/docker/daemon.json
 
 es.
 ```
-docker build -f hello.dockerfile -t  .
+docker build -f hello.dockerfile -t  hello-oci .
 ```
 
 ## run
