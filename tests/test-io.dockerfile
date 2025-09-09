@@ -1,6 +1,6 @@
 FROM gcc as builder
 COPY test-io.c /test-io.c
-COPY io.h /io.h
+COPY syscall.h /syscall.h
 RUN gcc -static -nostdlib -o /test-io /test-io.c 
 
 FROM scratch

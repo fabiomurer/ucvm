@@ -8,3 +8,4 @@ nothing-glibc
 read_secrets
 test-vdso
 cpu-privileges
+*.tar
